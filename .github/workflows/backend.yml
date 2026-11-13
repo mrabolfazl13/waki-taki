@@ -1,0 +1,78 @@
+name: backend
+
+on:
+  push:
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+  pull_request:
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install ruff
+      - name: Ruff lint
+        run: ruff check backend
+
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: securetalk_test
+          POSTGRES_USER: securetalk
+          POSTGRES_PASSWORD: testpassword
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U securetalk"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://securetalk:testpassword@127.0.0.1:5432/securetalk_test
+      REDIS_URL: redis://127.0.0.1:6379/0
+      SECRET_KEY: ci-only-test-secret-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+      - name: Run migrations
+        run: alembic upgrade head
+      # Fail if zero tests were collected: pytest exits 5 on "no tests ran",
+      # which we surface as an explicit error. Skipped tests still report.
+      - name: Run tests (fail if none collected)
+        run: |
+          set +e
+          python -m pytest tests -v --tb=short --strict-markers
+          code=$?
+          set -e
+          if [ "$code" -eq 5 ]; then
+            echo "FAIL: no tests collected"
+            exit 1
+          elif [ "$code" -ne 0 ]; then
+            echo "FAIL: tests failed (exit $code)"
+            exit "$code"
+          fi

@@ -1,0 +1,91 @@
+# SecureTalk production compose stack (per docs/ARCHITECTURE.md §10).
+# Copy .env.example -> .env and fill values before use. NEVER commit .env.
+
+services:
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: securetalk/api:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://securetalk:${POSTGRES_PASSWORD}@postgres:5432/securetalk
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8000"
+    networks:
+      - internal
+    # No host port publishing: only nginx is exposed.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: securetalk
+      POSTGRES_USER: securetalk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U securetalk -d securetalk"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # IMPORTANT (ARCHITECTURE §7): Redis holds only ephemeral state (presence,
+    # floor control, rate limits, media pub/sub). No voice/audio content is
+    # ever persisted; keys are TTL-scoped and lost on restart by design.
+    # --save "" disables RDB snapshots; --appendonly no disables AOF.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    expose:
+      - "6379"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/securetalk.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      # certbot webroot (see deploy/README.md TLS section)
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - api
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pgdata:
