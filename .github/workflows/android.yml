@@ -22,7 +22,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       # Explicit test task: a failing unit test fails this workflow.
       - name: Run unit tests
-        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+        run: |
+          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-test.log
+          exit ${PIPESTATUS[0]}
+      - name: Publish test log to summary
+        if: failure()
+        run: tail -120 /tmp/gradle-test.log >> "$GITHUB_STEP_SUMMARY"
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
       - name: Build release AAB
