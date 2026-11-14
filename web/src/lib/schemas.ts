@@ -9,7 +9,8 @@ import { z } from "zod";
 
 export const tokenPairSchema = z.object({
   access_token: z.string().min(1),
-  refresh_token: z.string().min(1).optional(),
+  // Backend always returns a refresh token alongside the access token.
+  refresh_token: z.string().min(1),
   token_type: z.string().optional(),
 });
 export type TokenPair = z.infer<typeof tokenPairSchema>;
@@ -26,9 +27,12 @@ export type User = z.infer<typeof userSchema>;
 export const channelSchema = z.object({
   id: z.string(),
   name: z.string(),
+  // /admin/channels includes owner_id + created_at; /channels (per-user) does not.
   owner_id: z.string().optional(),
   created_at: z.string().optional(),
+  epoch: z.number().int().positive().optional(),
   member_count: z.number().int().nonnegative().optional(),
+  is_owner: z.boolean().optional(),
 });
 export type Channel = z.infer<typeof channelSchema>;
 
@@ -49,12 +53,16 @@ export const membershipSchema = z.object({
 });
 export type Membership = z.infer<typeof membershipSchema>;
 
-export const adminRoleSchema = z.object({
-  id: z.string().optional(),
-  name: z.string(),
-  permissions: z.array(z.string()).optional(),
+/**
+ * POST /admin/roles takes {user_id, role: "user"|"admin"} and returns the
+ * updated user (UserOut). There is no GET /admin/roles endpoint in Phase 1.
+ */
+export const adminRoleInputSchema = z.object({
+  user_id: z.string().min(1),
+  role: z.enum(["user", "admin"]),
 });
-export type AdminRole = z.infer<typeof adminRoleSchema>;
+export type AdminRoleInput = z.infer<typeof adminRoleInputSchema>;
+export const adminRoleSchema = userSchema;
 
 export const securityEventSchema = z.object({
   id: z.string(),

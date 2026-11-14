@@ -64,16 +64,21 @@ class Hub:
         while True:
             pubsub = None
             try:
-                pubsub = self.redis.pubsub()
+                # Binary media frames must survive as bytes: never decode on pubsub.
+                pubsub = self.redis.pubsub(decode_responses=False)
                 await pubsub.psubscribe("media:*", "events:*")
                 async for message in pubsub.listen():
                     if message["type"] != "pmessage":
                         continue
                     channel = message["channel"]
+                    if isinstance(channel, (bytes, bytearray)):
+                        channel = bytes(channel).decode(errors="replace")
                     payload = message["data"]
                     if channel.startswith("media:"):
                         await self._on_remote_media(channel.split(":", 1)[1], payload)
                     else:
+                        if isinstance(payload, (bytes, bytearray)):
+                            payload = bytes(payload).decode(errors="replace")
                         await self._on_channel_event(channel.split(":", 1)[1], payload)
             except asyncio.CancelledError:
                 break
@@ -349,20 +354,16 @@ class Hub:
             return
         previous = await floor.floor_state(self.redis, channel_id)
         nxt = await floor.release_floor(self.redis, channel_id, device_id)
-        await safe_send(
-            conn.ws,
-            {"type": "floor.released", "data": {
+        released_msg = {
+            "type": "floor.released",
+            "data": {
                 "channel_id": channel_id, "previous_holder": previous.get("holder_device_id"),
-            }},
-        )
+            },
+        }
+        await safe_send(conn.ws, released_msg)
         for c in list(self.conns.values()):
-            if c.channel_id == channel_id:
-                await safe_send(
-                    c.ws,
-                    {"type": "floor.released", "data": {
-                        "channel_id": channel_id, "previous_holder": previous.get("holder_device_id"),
-                    }},
-                )
+            if c.channel_id == channel_id and c.device_id != device_id:
+                await safe_send(c.ws, released_msg)
         if nxt:
             await self._notify_grant(channel_id, nxt)
         else:
