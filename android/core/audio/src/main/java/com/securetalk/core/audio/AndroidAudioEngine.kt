@@ -107,9 +107,10 @@ class AndroidAudioEngine(
             require(rec.state == AudioRecord.STATE_INITIALIZED) { "AudioRecord not initialized (mic permission?)" }
 
             record = rec
-            rec.sessionId.takeIf { it != 0 }?.let { sessionId ->
-                if (AcousticEchoCanceler.isAvailable()) echoCanceler = AcousticEchoCanceler.create(sessionId)?.apply { enabled = true }
-                if (NoiseSuppressor.isAvailable()) noiseSuppressor = NoiseSuppressor.create(sessionId)?.apply { enabled = true }
+            val session = rec.audioSessionId
+            if (session != 0) {
+                if (AcousticEchoCanceler.isAvailable()) echoCanceler = AcousticEchoCanceler.create(session)?.apply { enabled = true }
+                if (NoiseSuppressor.isAvailable()) noiseSuppressor = NoiseSuppressor.create(session)?.apply { enabled = true }
             }
 
             if (codec == null) codec = MediaCodecCodec.create()

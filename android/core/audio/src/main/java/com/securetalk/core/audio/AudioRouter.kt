@@ -1,5 +1,6 @@
 package com.securetalk.core.audio
 
+import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
@@ -61,7 +62,7 @@ class AudioRouter(private val audioManager: AudioManager) {
 
     /** Registers a callback that fires on device add/remove; returns the unregister handle. */
     fun registerDeviceChangedListener(onChanged: () -> Unit): () -> Unit {
-        val listener = object : AudioManager.AudioDeviceCallback() {
+        val listener = object : AudioDeviceCallback() {
             override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) = onChanged()
             override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) = onChanged()
         }
