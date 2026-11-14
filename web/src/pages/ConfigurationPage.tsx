@@ -1,20 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
-import { api, ApiError } from "../lib/api";
-import { healthSchema, type HealthReport } from "../lib/schemas";
+import { useAdminConfig } from "../lib/queries";
+import { ApiError } from "../lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { ErrorState, LoadingState, UnavailableState } from "../components/ui/states";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 
 /**
- * Configuration is displayed only if the backend exposes an admin config
- * endpoint. No client-side configuration values are invented.
+ * Configuration is displayed only from the backend's GET /admin/config
+ * endpoint. Secrets are never displayed — the backend is responsible for
+ * redaction (it returns non-sensitive operational values only).
  */
 export default function ConfigurationPage() {
-  const config = useQuery<HealthReport>({
-    queryKey: ["admin", "config"],
-    queryFn: () => api("/admin/config", healthSchema),
-    retry: false,
-  });
+  const config = useAdminConfig();
 
   const entries = config.data ? Object.entries(config.data) : [];
 
@@ -33,7 +29,7 @@ export default function ConfigurationPage() {
         config.error instanceof ApiError && config.error.status === 404 ? (
           <UnavailableState
             title="Configuration endpoint unavailable"
-            reason="The backend does not currently expose GET /admin/config (not part of the §5 v1 surface). No configuration values are shown rather than guessing."
+            reason="The backend does not currently expose GET /admin/config. No configuration values are shown rather than guessing."
           />
         ) : (
           <ErrorState message={config.error.message} onRetry={() => config.refetch()} />

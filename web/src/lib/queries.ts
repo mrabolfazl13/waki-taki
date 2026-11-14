@@ -2,12 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { api, ApiError } from "./api";
 import {
+  adminConfigSchema,
+  adminSettingsSchema,
   auditLogSchema,
   channelSchema,
   healthSchema,
   listSchema,
   securityEventSchema,
   userSchema,
+  type AdminConfig,
+  type AdminSettings,
+  type AdminSettingsInput,
   type AuditLog,
   type Channel,
   type HealthReport,
@@ -75,5 +80,30 @@ export function useAdminList<T>(key: string, path: string, item: z.ZodType<T>) {
     queryKey: ["admin", key],
     queryFn: () => api(path, listSchema(item)),
     retry: false,
+  });
+}
+
+export function useAdminConfig() {
+  return useQuery<AdminConfig, ApiError>({
+    queryKey: ["admin", "config"],
+    queryFn: () => api("/admin/config", adminConfigSchema),
+    retry: false,
+  });
+}
+
+export function useAdminSettings() {
+  return useQuery<AdminSettings, ApiError>({
+    queryKey: ["admin", "settings"],
+    queryFn: () => api("/admin/settings", adminSettingsSchema),
+    retry: false,
+  });
+}
+
+export function useUpdateAdminSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AdminSettingsInput) =>
+      api("/admin/settings", adminSettingsSchema, { method: "PUT", body: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "settings"] }),
   });
 }

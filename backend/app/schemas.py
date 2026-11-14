@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StrictBool, field_validator, model_validator
 
 
 class RegisterIn(BaseModel):
@@ -108,6 +108,30 @@ class EnvelopeAckIn(BaseModel):
 
 class RotateIn(BaseModel):
     epoch: int | None = Field(default=None, ge=1)
+
+
+class AdminSettingsIn(BaseModel):
+    """Allow-listed operational toggles. Unknown keys are rejected (422)."""
+
+    model_config = {"extra": "forbid"}
+
+    registration_enabled: StrictBool | None = None
+    maintenance_mode: StrictBool | None = None
+    invite_creation_enabled: StrictBool | None = None
+
+    @model_validator(mode="after")
+    def require_at_least_one(self) -> "AdminSettingsIn":
+        if all(v is None for v in (self.registration_enabled, self.maintenance_mode, self.invite_creation_enabled)):
+            raise ValueError("at least one setting must be provided")
+        return self
+
+
+class AdminSettingsOut(BaseModel):
+    """Full effective settings (defaults merged with persisted overrides)."""
+
+    registration_enabled: bool
+    maintenance_mode: bool
+    invite_creation_enabled: bool
 
 
 class AdminRoleIn(BaseModel):

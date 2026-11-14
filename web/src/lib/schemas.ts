@@ -47,7 +47,9 @@ export type Device = z.infer<typeof deviceSchema>;
 
 export const membershipSchema = z.object({
   channel_id: z.string(),
+  channel_name: z.string().optional(),
   user_id: z.string(),
+  user_display_name: z.string().optional(),
   role: z.string().optional(),
   joined_at: z.string().optional(),
 });
@@ -88,6 +90,30 @@ export type AuditLog = z.infer<typeof auditLogSchema>;
 /** /admin/health: metric map. Keys are backend-defined; values are scalars. */
 export const healthSchema = z.record(z.union([z.string(), z.number(), z.boolean(), z.null()]));
 export type HealthReport = z.infer<typeof healthSchema>;
+
+/**
+ * GET /admin/config: non-sensitive operational configuration (rate limits,
+ * channel cap, token TTLs, floor parameters). Keys are backend-defined scalars;
+ * the backend never includes secrets in this response.
+ */
+export const adminConfigSchema = z.record(
+  z.union([z.string(), z.number(), z.boolean(), z.null()]),
+);
+export type AdminConfig = z.infer<typeof adminConfigSchema>;
+
+/**
+ * GET/PUT /admin/settings: allow-listed operational toggles persisted by the
+ * backend (defaults merged with overrides). PUT accepts a subset of these keys;
+ * unknown keys and non-boolean values are rejected by the backend (422).
+ */
+export const adminSettingsSchema = z.object({
+  registration_enabled: z.boolean(),
+  maintenance_mode: z.boolean(),
+  invite_creation_enabled: z.boolean(),
+});
+export type AdminSettings = z.infer<typeof adminSettingsSchema>;
+export const adminSettingsInputSchema = adminSettingsSchema.partial();
+export type AdminSettingsInput = z.infer<typeof adminSettingsInputSchema>;
 
 /** Accept either a bare array or an {items: [...]} envelope. */
 export function listSchema<T>(item: z.ZodType<T>): z.ZodType<T[]> {

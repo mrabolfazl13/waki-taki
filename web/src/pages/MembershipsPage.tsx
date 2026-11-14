@@ -11,7 +11,9 @@ export default function MembershipsPage() {
       path="/admin/memberships"
       itemSchema={membershipSchema}
       columns={[
+        { header: "Channel", cell: (m) => m.channel_name ?? <TruncatedId id={m.channel_id} /> },
         { header: "Channel ID", cell: (m) => <TruncatedId id={m.channel_id} /> },
+        { header: "User", cell: (m) => m.user_display_name ?? <TruncatedId id={m.user_id} /> },
         { header: "User ID", cell: (m) => <TruncatedId id={m.user_id} /> },
         { header: "Role", cell: (m) => (m.role ? <Badge variant="secondary">{m.role}</Badge> : <UnknownBadge />) },
         { header: "Joined", cell: (m) => (m.joined_at ? new Date(m.joined_at).toLocaleDateString() : "—") },
