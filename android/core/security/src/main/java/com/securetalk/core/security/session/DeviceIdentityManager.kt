@@ -4,6 +4,7 @@ import com.securetalk.core.common.model.DeviceId
 import com.securetalk.core.common.model.PreKeyBundleData
 import com.securetalk.core.security.engine.CryptoEngine
 import com.securetalk.core.security.store.SecretStore
+import java.nio.ByteBuffer
 import java.util.UUID
 
 /**

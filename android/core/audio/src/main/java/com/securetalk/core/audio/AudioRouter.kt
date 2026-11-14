@@ -74,7 +74,7 @@ class AudioRouter(private val audioManager: AudioManager) {
         deviceTypeToRoute(device.type) == route
 
     private fun deviceTypeToRoute(type: Int): com.securetalk.core.common.model.AudioRoute = when (type) {
-        AudioDeviceInfo.TYPE_SPEAKER -> com.securetalk.core.common.model.AudioRoute.SPEAKER
+        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> com.securetalk.core.common.model.AudioRoute.SPEAKER
         AudioDeviceInfo.TYPE_WIRED_HEADSET,
         AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
         AudioDeviceInfo.TYPE_USB_HEADSET -> com.securetalk.core.common.model.AudioRoute.WIRED

@@ -134,7 +134,7 @@ class SenderKeyManager(
             if (revokedSenders.contains(revocationKey(channelId.value, packet.sender.value))) {
                 return Result.failure(IllegalStateException("Sender ${packet.sender} revoked"))
             }
-            val window = replayWindows.getOrPut(replayKey(channelId.value, packet.sender.value, packet.epoch)) {
+            val window = replayWindows.getOrPut(replayKey(channelId.value, packet.sender.value, packet.epoch.toLong())) {
                 ReplayWindow(REPLAY_WINDOW)
             }
             synchronized(window) {

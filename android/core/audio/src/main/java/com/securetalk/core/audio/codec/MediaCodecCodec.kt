@@ -108,11 +108,11 @@ class MediaCodecAudioCodec(
 
     override fun start() {
         release()
-        encoder = MediaCodec.createEncoderByType(encodeFormat.getString(MediaFormat.KEY_MIME)).apply {
+        encoder = MediaCodec.createEncoderByType(encodeFormat.getString(MediaFormat.KEY_MIME) ?: "audio/opus").apply {
             configure(encodeFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             start()
         }
-        decoder = MediaCodec.createDecoderByType(decodeFormat.getString(MediaFormat.KEY_MIME)).apply {
+        decoder = MediaCodec.createDecoderByType(decodeFormat.getString(MediaFormat.KEY_MIME) ?: "audio/opus").apply {
             configure(decodeFormat, null, null, 0)
             start()
         }
@@ -138,14 +138,16 @@ class MediaCodecAudioCodec(
         val outIndex = enc.dequeueOutputBuffer(bufferInfo, 10_000)
         return when {
             outIndex >= 0 -> {
-                val buf = enc.getOutputBuffer(outIndex) ?: ByteArray(0)
-                val out = ByteArray(bufferInfo.size)
-                buf.position(bufferInfo.offset)
-                buf.get(out)
+                val buf = enc.getOutputBuffer(outIndex)
+                val out = if (buf == null) ByteArray(0) else {
+                    buf.position(bufferInfo.offset)
+                    buf.limit(bufferInfo.offset + bufferInfo.size)
+                    ByteArray(bufferInfo.size).also { buf.get(it) }
+                }
                 enc.releaseOutputBuffer(outIndex, false)
                 out
             }
-            outIndex == MediaCodec.INFO_TRY_AGAIN_LATER, outIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> ByteArray(0)
+            outIndex == MediaCodec.INFO_TRY_AGAIN_LATER || outIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> ByteArray(0)
             outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> ByteArray(0)
             else -> ByteArray(0)
         }
