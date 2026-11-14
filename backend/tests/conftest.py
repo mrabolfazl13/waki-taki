@@ -2,19 +2,28 @@
 from __future__ import annotations
 
 import base64
+import asyncio
 import os
+import selectors
+import sys
+
+# Windows: psycopg/asyncpg async requires a selector event loop, not Proactor.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 import fakeredis.aioredis
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-os.environ["ST_DATABASE_URL"] = "sqlite+aiosqlite:///./test.db"
-os.environ["ST_REDIS_URL"] = "redis://fakeredis"
-os.environ["ST_AUTO_CREATE_TABLES"] = "true"
-os.environ["ST_JWT_SECRET"] = "test-secret-0123456789abcdef0123456789abcdef"
-os.environ["ST_AUTH_RATE_LIMIT"] = "1000"
-os.environ["ST_INVITE_JOIN_RATE_LIMIT"] = "1000"
-os.environ["ST_INVITE_CREATE_RATE_LIMIT"] = "1000"
+# Default to a throwaway sqlite DB unless the environment already provides one
+# (e.g. CI points DATABASE_URL at postgres for real-backend runs).
+os.environ.setdefault("ST_DATABASE_URL", "sqlite+aiosqlite:///./test.db")
+os.environ["AUTO_CREATE_TABLES"] = "true"
+os.environ["REDIS_URL"] = "redis://fakeredis"
+os.environ["JWT_SECRET"] = "test-secret-0123456789abcdef0123456789abcdef"
+os.environ["AUTH_RATE_LIMIT"] = "1000"
+os.environ["INVITE_JOIN_RATE_LIMIT"] = "1000"
+os.environ["INVITE_CREATE_RATE_LIMIT"] = "1000"
 
 from app.core.config import get_settings
 
@@ -31,6 +40,9 @@ async def app_env():
         os.remove("./test.db")
     engine = make_engine(settings.database_url)
     async with engine.begin() as conn:
+        # drop_all first: persistent backends (postgres) keep rows across tests,
+        # and a stale row would break unique-name assumptions.
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     session_factory = make_sessionmaker(engine)
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)

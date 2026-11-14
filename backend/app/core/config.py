@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -17,15 +15,17 @@ class Settings(BaseSettings):
     app_name: str = "SecureTalk"
     database_url: str = Field(
         default="sqlite+aiosqlite:///./securetalk.db",
-        validation_alias=AliasChoices("DATABASE_URL", "ST_DATABASE_URL"),
+        # ST_-prefixed names take precedence (tests use them for isolation);
+        # plain names (CI/deploy) apply when no ST_ override is set.
+        validation_alias=AliasChoices("ST_DATABASE_URL", "DATABASE_URL"),
     )
     redis_url: str = Field(
         default="redis://localhost:6379/0",
-        validation_alias=AliasChoices("REDIS_URL", "ST_REDIS_URL"),
+        validation_alias=AliasChoices("ST_REDIS_URL", "REDIS_URL"),
     )
     jwt_secret: str = Field(
         default="dev-secret-change-me",
-        validation_alias=AliasChoices("JWT_SECRET", "SECRET_KEY", "ST_JWT_SECRET"),
+        validation_alias=AliasChoices("ST_JWT_SECRET", "JWT_SECRET", "SECRET_KEY"),
     )
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 15

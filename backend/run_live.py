@@ -8,7 +8,7 @@ import os
 import fakeredis.aioredis
 
 os.environ.setdefault("ST_DATABASE_URL", "sqlite+aiosqlite:///./live.db")
-os.environ.setdefault("ST_AUTO_CREATE_TABLES", "true")
+os.environ.setdefault("AUTO_CREATE_TABLES", "true")
 
 from app.db import make_engine, make_sessionmaker
 from app.deps import init_state

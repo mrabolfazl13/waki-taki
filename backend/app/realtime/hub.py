@@ -61,9 +61,20 @@ class Hub:
     async def _pubsub_loop(self) -> None:
         while True:
             pubsub = None
+            pubsub_client = None
             try:
-                # Binary media frames must survive as bytes: never decode on pubsub.
-                pubsub = self.redis.pubsub(decode_responses=False)
+                # Binary media frames must survive as bytes: prefer a pubsub
+                # that does not decode. redis-py's asyncio PubSub rejects the
+                # kwarg, so fall back to a dedicated non-decoding client.
+                try:
+                    pubsub = self.redis.pubsub(decode_responses=False)
+                except TypeError:
+                    from redis import asyncio as aioredis
+
+                    pubsub_client = aioredis.from_url(
+                        settings.redis_url, decode_responses=False
+                    )
+                    pubsub = pubsub_client.pubsub()
                 await pubsub.psubscribe("media:*", "events:*")
                 async for message in pubsub.listen():
                     if message["type"] != "pmessage":
@@ -87,6 +98,11 @@ class Hub:
                 if pubsub is not None:
                     try:
                         await pubsub.close()
+                    except Exception:
+                        pass
+                if pubsub_client is not None:
+                    try:
+                        await pubsub_client.close()
                     except Exception:
                         pass
 
