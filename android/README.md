@@ -36,10 +36,9 @@ cd android
 ./gradlew test                      # JVM unit tests (crypto, codec framing, jitter, floor)
 ```
 
-**Wrapper note:** `gradle/wrapper/gradle-wrapper.properties` and the `gradlew` scripts are
-committed, but the wrapper **JAR is not** (binary). CI generates it via
-`gradle/actions/wrapper-validation` + `setup-gradle`, or run once locally with an installed
-Gradle 8.7: `gradle wrapper --gradle-version 8.7`.
+**Wrapper note:** `gradle/wrapper/gradle-wrapper.properties`, the wrapper **JAR**
+(official Gradle 8.7 artifact) and the `gradlew` scripts are all committed, so CI can
+build directly. `gradle/actions/wrapper-validation` verifies the JAR's checksum.
 
 ## Key implementation decisions
 
