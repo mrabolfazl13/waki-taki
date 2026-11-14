@@ -1,6 +1,6 @@
 """JWT issuance/verification and password hashing (passlib[bcrypt])."""
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from passlib.context import CryptContext
@@ -25,7 +25,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 def create_token(secret: str, algorithm: str, user_id: str, role: str, kind: str, ttl: timedelta) -> tuple[str, str]:
     """Returns (token, jti)."""
     jti = uuid.uuid4().hex
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": user_id,
         "role": role,

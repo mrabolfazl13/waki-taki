@@ -1,15 +1,32 @@
+from typing import Optional
+
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Runtime configuration. Env vars use the ST_ prefix (e.g. ST_DATABASE_URL)."""
+    """Runtime configuration.
 
-    model_config = SettingsConfigDict(env_prefix="ST_", env_file=".env", extra="ignore")
+    Environment variables are read with several accepted names so that CI
+    (DATABASE_URL/REDIS_URL/SECRET_KEY), deployment (.env.example) and the
+    legacy ST_-prefixed style all work. Plain names take precedence.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="", env_file=".env", extra="ignore")
 
     app_name: str = "SecureTalk"
-    database_url: str = "sqlite+aiosqlite:///./securetalk.db"
-    redis_url: str = "redis://localhost:6379/0"
-    jwt_secret: str = "dev-secret-change-me"
+    database_url: str = Field(
+        default="sqlite+aiosqlite:///./securetalk.db",
+        validation_alias=AliasChoices("DATABASE_URL", "ST_DATABASE_URL"),
+    )
+    redis_url: str = Field(
+        default="redis://localhost:6379/0",
+        validation_alias=AliasChoices("REDIS_URL", "ST_REDIS_URL"),
+    )
+    jwt_secret: str = Field(
+        default="dev-secret-change-me",
+        validation_alias=AliasChoices("JWT_SECRET", "SECRET_KEY", "ST_JWT_SECRET"),
+    )
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 15
     refresh_token_days: int = 30

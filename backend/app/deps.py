@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
@@ -10,8 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .core.config import get_settings
 from .core.security import TokenError, decode_token
-from .db import make_redis, make_sessionmaker
-from .models import Membership, Role, User, SecurityEvent, AuditLog
+from .models import AuditLog, Membership, Role, SecurityEvent, User
 
 log = logging.getLogger("securetalk.deps")
 

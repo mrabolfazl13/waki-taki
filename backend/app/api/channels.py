@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.config import get_settings
 from ..core.ratelimit import check_rate_limit
 from ..deps import get_current_user, get_db, get_redis, record_security_event
-from ..models import Channel, Invite, Membership, MemberRole, Role, User, utcnow
+from ..models import Channel, Invite, MemberRole, Membership, Role, User, utcnow
 from ..schemas import (
     ChannelIn,
     ChannelOut,
@@ -100,7 +100,6 @@ async def delete_channel(
     channel.deleted_at = utcnow()
     await session.commit()
     await record_security_event(session, "channel.deleted", channel_id=channel_id, user_id=user.id)
-    return None
 
 
 @router.post("/{channel_id}/join", response_model=ChannelOut)
@@ -181,7 +180,6 @@ async def leave_channel(
         f"events:{channel_id}",
         json.dumps({"channel_id": channel_id, "event": "member_left", "user_id": user.id}),
     )
-    return None
 
 
 @router.post("/{channel_id}/invites", response_model=InviteOut)

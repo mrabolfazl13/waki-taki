@@ -66,4 +66,3 @@ async def delete_device(
     await record_security_event(
         session, "device.revoked", severity="warning", user_id=user.id, detail={"device_id": device_id}
     )
-    return None

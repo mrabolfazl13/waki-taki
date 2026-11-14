@@ -118,7 +118,7 @@ async def test_member_removal_rotates_epoch(client):
         r = await client.get(f"/api/v1/channels/{cid}/epoch/rotate", headers=owner_h)
         # (GET not defined; check via channels list)
         r = await client.get("/api/v1/channels", headers=owner_h)
-        chan = [c for c in r.json() if c["id"] == cid][0]
+        chan = next(c for c in r.json() if c["id"] == cid)
         assert chan["epoch"] >= 2
     else:
         pytest.skip("owner not admin in this DB state")

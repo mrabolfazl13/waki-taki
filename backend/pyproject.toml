@@ -1,0 +1,17 @@
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+# Keep the default rule set (E, F) plus bugbear; relax rules that conflict with
+# idiomatic FastAPI/asyncio patterns in this codebase.
+ignore = [
+    "B008",  # function call in argument defaults — FastAPI Depends() pattern
+    "BLE001", # broad except at WS/relay boundaries (logged + connection closed)
+    "S110",  # try-except-pass in best-effort cleanup paths
+    "RUF059", # intentionally-unpacked test/context tuples
+    "E501",  # long lines allowed in generated schemas/tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F841", "E501"]

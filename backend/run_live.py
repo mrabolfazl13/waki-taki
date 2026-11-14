@@ -10,9 +10,9 @@ import fakeredis.aioredis
 os.environ.setdefault("ST_DATABASE_URL", "sqlite+aiosqlite:///./live.db")
 os.environ.setdefault("ST_AUTO_CREATE_TABLES", "true")
 
-from app.db import make_engine, make_sessionmaker  # noqa: E402
-from app.deps import init_state  # noqa: E402
-from app.main import create_app  # noqa: E402
+from app.db import make_engine, make_sessionmaker
+from app.deps import init_state
+from app.main import create_app
 
 engine = make_engine(os.environ["ST_DATABASE_URL"])
 redis = fakeredis.aioredis.FakeRedis(decode_responses=True)

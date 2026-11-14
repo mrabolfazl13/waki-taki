@@ -1,8 +1,7 @@
 """Auth endpoints: register, login, refresh (rotation), logout."""
 from __future__ import annotations
 
-import hashlib
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
@@ -43,7 +42,7 @@ async def _store_refresh(session: AsyncSession, jti: str, user_id: str) -> None:
         RefreshToken(
             jti=jti,
             user_id=user_id,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_days),
+            expires_at=datetime.now(UTC) + timedelta(days=settings.refresh_token_days),
         )
     )
     await session.commit()
@@ -135,9 +134,9 @@ async def logout(body: RefreshIn, session: AsyncSession = Depends(get_db)) -> No
     try:
         payload = decode_token(settings.jwt_secret, settings.jwt_algorithm, body.refresh_token, "refresh")
     except TokenError:
-        return None
+        return
     stored = await session.get(RefreshToken, payload["jti"])
     if stored is not None:
         stored.revoked = True
         await session.commit()
-    return None
+    return

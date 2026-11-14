@@ -39,7 +39,7 @@ async def test_admin_memberships_and_devices(client):
     rows = r.json()
     assert isinstance(rows, list) and rows
     row = next(m for m in rows if m["user_display_name"] == "mjoiner")
-    assert row["channel_name"] == f"chan-mowner"
+    assert row["channel_name"] == "chan-mowner"
     assert row["role"] == "member"
     assert row["joined_at"]
     # summary fields present, but no key material anywhere

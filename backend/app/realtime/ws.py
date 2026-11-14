@@ -1,10 +1,9 @@
 """WebSocket route (mounted at /ws and /api/v1/ws)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, WebSocket
+from fastapi import APIRouter, Query, WebSocket
 
 from ..core.config import get_settings
-from ..core.security import TokenError, decode_token
 from .hub import Hub
 
 settings = get_settings()

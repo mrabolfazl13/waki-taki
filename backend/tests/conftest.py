@@ -1,16 +1,12 @@
 """Shared fixtures: aiosqlite DB + fakeredis + httpx ASGI client."""
 from __future__ import annotations
 
-import asyncio
 import base64
 import os
-import struct
 
 import fakeredis.aioredis
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import async_sessionmaker
 
 os.environ["ST_DATABASE_URL"] = "sqlite+aiosqlite:///./test.db"
 os.environ["ST_REDIS_URL"] = "redis://fakeredis"
@@ -20,13 +16,13 @@ os.environ["ST_AUTH_RATE_LIMIT"] = "1000"
 os.environ["ST_INVITE_JOIN_RATE_LIMIT"] = "1000"
 os.environ["ST_INVITE_CREATE_RATE_LIMIT"] = "1000"
 
-from app.core.config import get_settings  # noqa: E402
+from app.core.config import get_settings
 
 settings = get_settings()
 
-from app.db import Base, make_engine, make_sessionmaker  # noqa: E402
-from app.deps import init_state  # noqa: E402
-from app.main import create_app  # noqa: E402
+from app.db import Base, make_engine, make_sessionmaker
+from app.deps import init_state
+from app.main import create_app
 
 
 @pytest_asyncio.fixture

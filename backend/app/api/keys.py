@@ -8,8 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
-from ..deps import get_current_user, get_db, get_membership, get_redis, record_security_event
-from ..models import Channel, Membership, MemberRole, Revocation, Role, User, utcnow
+from ..deps import (
+    get_current_user,
+    get_db,
+    get_membership,
+    get_redis,
+    record_security_event,
+)
+from ..models import Channel, MemberRole, Membership, Revocation, Role, User
 from ..schemas import EnvelopeAckIn, KeyDistributeIn, RotateIn
 
 router = APIRouter(prefix="/channels/{channel_id}", tags=["keys"])
@@ -133,7 +139,6 @@ async def ack_envelopes(
     await session.commit()
     if deleted != len(body.envelope_ids):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"deleted_{deleted}_of_{len(body.envelope_ids)}")
-    return None
 
 
 @router.post("/epoch/rotate")
@@ -202,4 +207,3 @@ async def remove_member(
         json.dumps({"channel_id": channel_id, "event": "member_removed",
                     "user_id": user_id, "epoch": channel.epoch}),
     )
-    return None

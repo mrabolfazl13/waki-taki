@@ -120,7 +120,7 @@ class AdminSettingsIn(BaseModel):
     invite_creation_enabled: StrictBool | None = None
 
     @model_validator(mode="after")
-    def require_at_least_one(self) -> "AdminSettingsIn":
+    def require_at_least_one(self) -> AdminSettingsIn:
         if all(v is None for v in (self.registration_enabled, self.maintenance_mode, self.invite_creation_enabled)):
             raise ValueError("at least one setting must be provided")
         return self

@@ -7,7 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
 from ..deps import get_admin_user, get_db, get_redis, record_audit
-from ..models import AuditLog, Channel, Device, Membership, Role, SecurityEvent, Setting, User
+from ..models import (
+    AuditLog,
+    Channel,
+    Device,
+    Membership,
+    Role,
+    SecurityEvent,
+    Setting,
+    User,
+)
 from ..schemas import AdminRoleIn, AdminSettingsIn, AdminSettingsOut, UserOut
 
 router = APIRouter(prefix="/admin", tags=["admin"])

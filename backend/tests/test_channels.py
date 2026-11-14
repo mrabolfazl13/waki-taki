@@ -1,8 +1,6 @@
 """Devices, key discovery, channels, 20-cap, invites."""
 from __future__ import annotations
 
-import base64
-
 import pytest
 
 from tests.conftest import auth_hdr, make_device, register, setup_channel

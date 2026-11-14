@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import base64
+import os
 import struct
 
 import fakeredis.aioredis
 import pytest
 from starlette.testclient import TestClient
+
 
 def _register(tc, name, password="password123"):
     r = tc.post("/api/v1/auth/register", json={"display_name": name, "password": password})

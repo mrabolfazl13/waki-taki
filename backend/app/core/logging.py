@@ -43,7 +43,7 @@ class JsonFormatter(logging.Formatter):
 
 
 class RedactFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+    def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
         if _SECRET_KEY_RE.search(msg) and ("=" in msg or ":" in msg):
             record.msg = redact_text(msg)

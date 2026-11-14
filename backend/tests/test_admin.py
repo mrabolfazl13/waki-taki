@@ -24,7 +24,7 @@ async def test_admin_endpoints_gated(client):
     ):
         r = await client.get(path, headers=auth_hdr(t))
         assert r.status_code == 403, path
-    r = await client.post("/api/v1/health/details")  # noqa
+    r = await client.post("/api/v1/health/details")
     # health/details requires admin
     r = await client.get("/health/details")
     assert r.status_code in (401, 403)

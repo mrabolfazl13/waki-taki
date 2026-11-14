@@ -7,7 +7,6 @@ Backend reads ONLY the plaintext header (never stores/decrypts media).
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
 import logging
 import struct
@@ -15,13 +14,12 @@ import uuid
 from dataclasses import dataclass, field
 
 from fastapi import WebSocket, WebSocketDisconnect
-from redis.exceptions import WatchError
 from sqlalchemy import select
 
 from ..core.config import get_settings
 from ..core.security import TokenError, decode_token
 from ..floor_control import service as floor
-from ..models import Channel, Device, Membership, Role, User
+from ..models import Channel, Device, Membership, User
 
 settings = get_settings()
 log = logging.getLogger("securetalk.hub")
