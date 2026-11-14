@@ -27,7 +27,17 @@ jobs:
           exit ${PIPESTATUS[0]}
       - name: Publish test log to summary
         if: failure()
-        run: tail -120 /tmp/gradle-test.log >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          grep -E "^e: " /tmp/gradle-test.log | head -8 | while IFS= read -r line; do
+            echo "::error::${line/#e: /}"
+          done
+          {
+            echo "### What went wrong"
+            grep -A 15 "What went wrong" /tmp/gradle-test.log || tail -30 /tmp/gradle-test.log
+          } | sed 's/::error::/ERR:/g' >> "$GITHUB_STEP_SUMMARY"
+          grep -A 15 "What went wrong" /tmp/gradle-test.log | head -6 | while IFS= read -r line; do
+            [ -n "$line" ] && echo "::error::$line"
+          done
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
       - name: Build release AAB
