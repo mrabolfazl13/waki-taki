@@ -1,10 +1,9 @@
 """Shared fixtures: aiosqlite DB + fakeredis + httpx ASGI client."""
 from __future__ import annotations
 
-import base64
 import asyncio
+import base64
 import os
-import selectors
 import sys
 
 # Windows: psycopg/asyncpg async requires a selector event loop, not Proactor.
