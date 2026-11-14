@@ -46,8 +46,8 @@ class SecureSessionManagerImpl(
         val bundle = remoteBundle ?: bundleDirectory.bundleFor(peer).getOrNull()
             ?: return Result.failure(IllegalStateException("No prekey bundle for $peer"))
 
-        val identity = identityManager.ensureIdentity()
-        val (sk, envelope) = X3dhLite.initiate(engine, identity.x25519Private, bundle)
+        val bundleData = identityManager.ensureIdentity()
+        val (sk, envelope) = X3dhLite.initiate(engine, bundleData.identity.x25519Private, bundle)
         val ratchet = DoubleRatchetLite(engine)
         ratchet.initializeSend(peer.value, sk)
         ratchet.initializeRecv(peer.value, sk) // same SK on both chains; counters separate directions
@@ -83,14 +83,14 @@ class SecureSessionManagerImpl(
                 offset = 1 + 32 + 32 + 8 // 73
             }
             if (offset > 0) {
-                val identity = identityManager.ensureIdentity()
+                val bundleData = identityManager.ensureIdentity()
                 val header = ciphertext.copyOfRange(0, offset)
                 val opkId = ByteBuffer.wrap(header, 65, 8).long
                 val opkPriv = if (opkId >= 0) identityManager.consumeOneTimePrekey(opkId)?.private else null
                 val sk = X3dhLite.respond(
                     engine,
-                    identity.x25519Private,
-                    identity.signedPreKey.private,
+                    bundleData.identity.x25519Private,
+                    bundleData.signedPreKey.private,
                     opkPriv,
                     header,
                 )
