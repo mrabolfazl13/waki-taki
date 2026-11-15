@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -248,7 +249,7 @@ fun LocalJoinScreen(
         }
         Spacer(Modifier.height(12.dp))
         hosts.forEach { host ->
-            Card(Modifier.fillMaxWidth(), onClick = { viewModel.connectTo(host) }) {
+            Card(onClick = { viewModel.connectTo(host) }, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
                     Text(host.hostName, style = MaterialTheme.typography.titleMedium)
                     Text("${host.address}:${host.port}", style = MaterialTheme.typography.labelSmall, color = StColors.Teal)
