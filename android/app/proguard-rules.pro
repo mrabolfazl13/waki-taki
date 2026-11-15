@@ -11,3 +11,5 @@
 -dontwarn com.google.crypto.tink.**
 # Ktor
 -dontwarn io.ktor.**
+# Ktor/CIO pulls in slf4j whose optional StaticLoggerBinder is absent on Android
+-dontwarn org.slf4j.**
