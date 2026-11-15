@@ -156,7 +156,7 @@ fun ModeSelectScreen(
     ) {
         Text("Choose mode", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(24.dp))
-        Card(Modifier.fillMaxWidth(), onClick = onPickInternet) {
+        Card(onClick = onPickInternet, modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Text("INTERNET MODE", style = MaterialTheme.typography.labelLarge, color = StColors.Amber)
                 Spacer(Modifier.height(6.dp))
@@ -164,7 +164,7 @@ fun ModeSelectScreen(
             }
         }
         Spacer(Modifier.height(12.dp))
-        Card(Modifier.fillMaxWidth(), onClick = onPickLocal) {
+        Card(onClick = onPickLocal, modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Text("OFFLINE MODE", style = MaterialTheme.typography.labelLarge, color = StColors.Teal)
                 Spacer(Modifier.height(6.dp))
