@@ -2,6 +2,7 @@ package com.securetalk.core.network.localhost
 
 import com.securetalk.core.common.model.MediaPacketCodec
 import io.ktor.server.application.Application
+import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.ApplicationEngine
@@ -11,6 +12,7 @@ import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
+import io.ktor.websocket.close
 import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.readBytes
 import io.ktor.websocket.readText

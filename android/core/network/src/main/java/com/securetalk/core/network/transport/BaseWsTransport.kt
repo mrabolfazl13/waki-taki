@@ -54,7 +54,7 @@ abstract class BaseWsTransport(
 
     /** URL and per-mode auth for the WS endpoint. */
     protected abstract fun buildRequest(): Request
-    protected abstract fun onOpenHook()
+    protected open fun onOpenHook() = Unit
     protected open fun maxReconnectAttempts(): Int = Int.MAX_VALUE
 
     override suspend fun connect(): Result<Unit> {

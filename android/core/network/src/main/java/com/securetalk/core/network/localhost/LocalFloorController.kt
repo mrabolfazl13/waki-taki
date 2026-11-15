@@ -28,11 +28,6 @@ class LocalFloorController(private val clock: () -> Long = System::currentTimeMi
 
     private val floors = HashMap<String, ChannelFloor>()
 
-    val LEASE_TTL_MS = 60_000L
-    private const val RATE_LIMIT = 10
-    private const val RATE_WINDOW_MS = 10_000L
-    const val QUEUE_DEPTH = 20
-
     @Synchronized
     fun request(channelId: String, deviceId: String): RequestResult {
         val floor = floors.getOrPut(channelId) { ChannelFloor() }
@@ -154,5 +149,12 @@ class LocalFloorController(private val clock: () -> Long = System::currentTimeMi
             i++
         }
         return -1
+    }
+
+    companion object {
+        const val LEASE_TTL_MS = 60_000L
+        private const val RATE_LIMIT = 10
+        private const val RATE_WINDOW_MS = 10_000L
+        const val QUEUE_DEPTH = 20
     }
 }

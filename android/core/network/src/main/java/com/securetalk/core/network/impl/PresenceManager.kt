@@ -37,10 +37,11 @@ class PresenceManager(
                 when (event) {
                     is WsEvent.PresenceUpdate -> updatePresence(event.channelId.value, event.deviceId, event.state)
                     is WsEvent.FloorEvent -> {
-                        if (event.state == "speaking" && event.holder != null) {
-                            updateSpeaking(event.channelId.value, event.holder, true)
+                        val holder = event.holder
+                        if (event.state == "speaking" && holder != null) {
+                            updateSpeaking(event.channelId.value, holder, true)
                         } else {
-                            event.holder?.let { updateSpeaking(event.channelId.value, it, false) }
+                            holder?.let { updateSpeaking(event.channelId.value, it, false) }
                         }
                     }
                     is WsEvent.ChannelEvent -> scope.launch { refreshMembers(event.channelId) }

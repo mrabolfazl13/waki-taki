@@ -83,22 +83,24 @@ class ChannelManagerImpl(
         Result.failure(e)
     }
 
-    override suspend fun joinChannel(inviteCode: String): Result<ChannelInfo> = try {
-        // invites/validate first, then join by code
-        val validated = api.validateInvite(ValidateInviteRequest(inviteCode))
-        if (!validated.valid) {
-            return Result.failure(IllegalArgumentException("Invite invalid or expired"))
+    override suspend fun joinChannel(inviteCode: String): Result<ChannelInfo> {
+        return try {
+            // invites/validate first, then join by code
+            val validated = api.validateInvite(ValidateInviteRequest(inviteCode))
+            if (!validated.valid) {
+                return Result.failure(IllegalArgumentException("Invite invalid or expired"))
+            }
+            val channelId = validated.channel_id
+                ?: return Result.failure(IllegalArgumentException("Invite missing channel"))
+            val joined = api.joinChannel(channelId, JoinRequest(inviteCode))
+            val info = ChannelInfo(ChannelId(joined.id), joined.name, joined.member_count, false, joined.epoch, false)
+            channelDao.upsert(
+                ChannelEntity(info.id.value, info.name, info.memberCount, false, info.epoch, info.isOwner, System.currentTimeMillis()),
+            )
+            Result.success(info)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
-        val channelId = validated.channel_id
-            ?: return Result.failure(IllegalArgumentException("Invite missing channel"))
-        val joined = api.joinChannel(channelId, JoinRequest(inviteCode))
-        val info = ChannelInfo(ChannelId(joined.id), joined.name, joined.member_count, false, joined.epoch, false)
-        channelDao.upsert(
-            ChannelEntity(info.id.value, info.name, info.memberCount, false, info.epoch, info.isOwner, System.currentTimeMillis()),
-        )
-        Result.success(info)
-    } catch (e: Exception) {
-        Result.failure(e)
     }
 
     override suspend fun leaveChannel(id: ChannelId): Result<Unit> = try {
