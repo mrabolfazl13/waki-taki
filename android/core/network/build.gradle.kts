@@ -23,7 +23,7 @@ android {
 
 dependencies {
     api(project(":core:common"))
-    implementation(project(":core:security"))
+    api(project(":core:security"))
     implementation(project(":core:database"))
 
     api(libs.okhttp)

@@ -30,14 +30,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.securetalk.core.common.domain.ChannelManager
+import com.securetalk.core.common.model.ChannelId
 import com.securetalk.core.common.model.ChannelInfo
 import com.securetalk.core.common.model.InvitePayload
 import com.securetalk.core.design.StColors
 import com.securetalk.core.network.util.QrBitmap
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -47,6 +50,7 @@ class ChannelsViewModel @Inject constructor(
 ) : ViewModel() {
 
     val channels: StateFlow<List<ChannelInfo>> = channelManager.channels
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
@@ -85,7 +89,7 @@ class ChannelsViewModel @Inject constructor(
     fun createInvite(channelId: String) {
         _busy.value = true
         viewModelScope.launch {
-            channelManager.createInvite(channelId)
+            channelManager.createInvite(ChannelId(channelId))
                 .onSuccess { _createdInvite.value = it }
                 .onFailure { _error.value = it.message }
             _busy.value = false
