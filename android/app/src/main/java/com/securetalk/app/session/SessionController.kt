@@ -52,9 +52,20 @@ class SessionController @Inject constructor(
             monitor.transitions.collect { transition ->
                 when (transition) {
                     is ConnectionTransition.Changed -> {
-                        modeHolder.useLocal = transition.to == ConnectionState_LOCAL_AVAILABLE
+                        // Only the explicit confirmSwitchTo* path emits this exact
+                        // pair after a user decision; passive probing never sets
+                        // LOCAL_AVAILABLE any more (§8: no silent downgrade).
+                        if (transition.to == ConnectionState_LOCAL_AVAILABLE &&
+                            transition.from == com.securetalk.core.common.model.ConnectionState.ONLINE_CONNECTED
+                        ) {
+                            modeHolder.useLocal = true
+                        } else if (transition.to == com.securetalk.core.common.model.ConnectionState.ONLINE_CONNECTED &&
+                            transition.from == ConnectionState_LOCAL_AVAILABLE
+                        ) {
+                            modeHolder.useLocal = false
+                        }
                     }
-                    is ConnectionTransition.RequiresUserDecision -> Unit // UI decides (never silent — §8)
+                    is ConnectionTransition.RequiresUserDecision -> Unit // UI decides
                 }
             }
         }
@@ -69,6 +80,7 @@ class SessionController @Inject constructor(
         scope.launch {
             transport.events.collect { event ->
                 when (event) {
+                    is WsEvent.Joined -> onJoined(event)
                     is WsEvent.MediaReceived -> onMedia(event)
                     is WsEvent.ChannelEvent -> onChannelEvent(event)
                     else -> Unit
@@ -99,6 +111,18 @@ class SessionController @Inject constructor(
                 audioEngine.stopPlayback()
                 audioEngine.startPlayback(ChannelId(channelId))
             }
+        }
+    }
+
+    /** A successful WS join is the point at which playback and key pull begin. */
+    private fun onJoined(event: WsEvent.Joined) {
+        setActiveChannelForPlayback(event.channelId.value)
+        scope.launch {
+            (envelopeTransport as? com.securetalk.core.network.impl.EnvelopeTransportImpl)
+                ?.fetchPending(event.channelId)
+                ?.onSuccess { envelopes ->
+                    envelopes.forEach { groupKeyManager.handleEnvelopeReceived(it) }
+                }
         }
     }
 

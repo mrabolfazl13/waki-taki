@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
+from ..core.flags import effective_flags
 from ..deps import get_admin_user, get_db, get_redis, record_audit
 from ..models import (
     AuditLog,
@@ -48,6 +49,21 @@ async def disable_user(
     user.disabled = True
     await session.commit()
     await record_audit(session, admin.id, "user.disable", f"user:{user_id}")
+    return UserOut(id=user.id, display_name=user.display_name, role=user.role.value, disabled=user.disabled)
+
+
+@router.post("/users/{user_id}/enable", response_model=UserOut)
+async def enable_user(
+    user_id: str,
+    admin: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_db),
+) -> UserOut:
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
+    user.disabled = False
+    await session.commit()
+    await record_audit(session, admin.id, "user.enable", f"user:{user_id}")
     return UserOut(id=user.id, display_name=user.display_name, role=user.role.value, disabled=user.disabled)
 
 
@@ -148,13 +164,8 @@ async def get_security_events(
 
 # ---------- Dashboard endpoints (memberships, devices, config, settings) ----------
 
-# Operational toggles: key -> default value. Only these keys are editable via
-# PUT /admin/settings; unknown keys are rejected. Documented in docs/API_NOTES.md.
-SETTING_DEFAULTS: dict[str, bool] = {
-    "registration_enabled": True,
-    "maintenance_mode": False,
-    "invite_creation_enabled": True,
-}
+# Operational toggles live in core.flags so other routers can enforce them.
+# Only these keys are editable via PUT /admin/settings; unknown keys are rejected.
 
 
 @router.get("/memberships")
@@ -236,12 +247,7 @@ async def get_settings_endpoint(
     admin: User = Depends(get_admin_user), session: AsyncSession = Depends(get_db)
 ) -> AdminSettingsOut:
     """Effective operational settings (defaults merged with persisted overrides)."""
-    effective = dict(SETTING_DEFAULTS)
-    rows = await session.scalars(select(Setting).where(Setting.key.in_(SETTING_DEFAULTS)))
-    for row in rows:
-        if isinstance(row.value, dict) and "value" in row.value:
-            effective[row.key] = bool(row.value["value"])
-    return AdminSettingsOut(**effective)
+    return AdminSettingsOut(**await effective_flags(session))
 
 
 @router.put("/settings", response_model=AdminSettingsOut)

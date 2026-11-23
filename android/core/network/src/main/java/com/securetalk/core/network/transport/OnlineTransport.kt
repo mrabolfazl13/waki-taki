@@ -22,17 +22,21 @@ class OnlineTransport(
     private val api: SecureTalkApi,
     private val tokens: TokenManager,
     private var baseUrl: String,
-) : BaseWsTransport(client, scope) {
+    deviceId: String = "",
+) : BaseWsTransport(client, scope, deviceId) {
 
     fun updateBaseUrl(url: String) {
         baseUrl = url
     }
 
     override fun buildRequest(): Request {
+        // baseUrl is the server origin (no /api/v1); append the WS path exactly once.
         val httpUrl = baseUrl.trimEnd('/').toHttpUrl()
         val wsUrl = httpUrl.newBuilder()
             .scheme(if (httpUrl.scheme == "https") "wss" else "ws")
-            .addPathSegments("api/v1/ws")
+            .addPathSegment("api")
+            .addPathSegment("v1")
+            .addPathSegment("ws")
             .addQueryParameter("token", tokens.accessToken ?: "")
             .build()
         return Request.Builder().url(wsUrl).build()
@@ -42,7 +46,9 @@ class OnlineTransport(
         val response = api.distributeKeys(
             envelope.channelId.value,
             DistributeKeysRequest(
-                listOf(
+                sender_device_id = deviceId,
+                epoch = envelope.epoch,
+                envelopes = listOf(
                     EnvelopeDto(
                         recipient_device_id = envelope.recipientDeviceId.value,
                         epoch = envelope.epoch,

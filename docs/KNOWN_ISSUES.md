@@ -1,22 +1,16 @@
 # Known Issues — open items found during integration (Agent H, 2026-11-14)
 
-1. **Fakeredis + binary pub/sub crash (medium, blocks multi-instance media test locally).**
-   `app/realtime/hub.py` `_pubsub_loop` dies with
-   `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc1` when a binary frame is published to
-   `media:{channel_id}` while the Redis connection uses `decode_responses=True` (the factory in
-   `app/db.py make_redis` and the fakeredis instance in tests/live launcher both do). The loop
-   catches and logs the error, but after the crash cross-instance media/events fan-out stops until
-   reconnect. **Likely affects real Redis too** (redis-py decodes pub/sub payloads on
-   `decode_responses=True` connections); the pubsub connection should be created with
-   `decode_responses=False`, or media should be base64-encoded on the wire. Verified live via
-   uvicorn log; not reproduced against real Redis (not available locally).
-2. **Duplicate `floor.released` frames (low).** On `floor.release`, the releasing client receives
-   the `floor.released` frame twice (once via `_floor_release` direct send, once via the broadcast
-   loop that includes the sender). Same for some error frames observed twice in scripted tests.
-   Harmless but should be deduped (`_floor_release` broadcast should exclude the sender).
+1. ~~**Fakeredis + binary pub/sub crash**~~ — **FIXED (2026-11-23).** Media payloads published to
+   `media:{channel_id}` are now base64 text (`hub._on_remote_media` decodes), so a single normal
+   pubsub client works with `decode_responses=True` on both real Redis and fakeredis. The brittle
+   second-client fallback was removed. Not yet exercised across two live API processes; unit suite
+   no longer emits the `PubSub.__del__` warning.
+2. ~~**Duplicate `floor.released` frames**~~ — already fixed in `hub._floor_release` (sender
+   excluded from the broadcast). Stale entry retained for history.
+
 6. **Envelope fetch requires `device_id` query param (informational / contract note).**
    `GET /channels/{id}/keys/envelopes?device_id=…` is mandatory; ARCHITECTURE §5 does not mention
-   the parameter. Documented here so client agents (B–E) know.
+   the parameter. Android `SecureTalkApi.fetchKeyEnvelopes` now supplies it (2026-11-23).
 7. **Invite creation returns 200, not 201 (trivial).** §5 does not pin a status; noting actual
    behavior (200) for client agents.
 8. **Live-run helper requires fakeredis injection (informational).** `app.main:app` defaults to a

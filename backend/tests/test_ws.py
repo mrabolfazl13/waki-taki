@@ -220,6 +220,22 @@ class TestMediaRelay:
             m = w2.receive_json()
             assert m["type"] == "error" and m["data"]["code"] == "floor_not_held"
 
+    def test_stale_epoch_rejected(self, ws):
+        ctx = _join_channel(ws)
+        cid, odev = ctx["cid"], ctx["owner_dev"]
+        rotator = {"Authorization": f"Bearer {ctx['owner']['access_token']}"}
+        assert ws.post(f"/api/v1/channels/{cid}/epoch/rotate", headers=rotator).json()["epoch"] == 2
+        with ws.websocket_connect(f"/ws?token={ctx['owner']['access_token']}") as w1, \
+             ws.websocket_connect(f"/ws?token={ctx['member']['access_token']}") as w2:
+            _join_two(w1, w2, ctx)
+            w1.send_json({"type": "floor.request", "data": {"channel_id": cid}})
+            _recv_until(w1, {"floor.granted"})
+            # Frame claims epoch 1 while the channel is at epoch 2.
+            w1.send_bytes(MEDIA_HEADER.pack(1, bytes.fromhex(odev), 1) + b"stale")
+            m = _recv_until(w1, {"error"})
+            assert m["data"]["code"] == "epoch_mismatch"
+            assert m["data"]["expected"] == 2
+
     def test_signaling_relay(self, ws):
         ctx = _join_channel(ws)
         cid, odev, mdev = ctx["cid"], ctx["owner_dev"], ctx["member_dev"]

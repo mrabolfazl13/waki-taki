@@ -46,7 +46,9 @@ class EnvelopeTransportImpl(
                 val response = api.distributeKeys(
                     channelId.value,
                     DistributeKeysRequest(
-                        batch.map {
+                        sender_device_id = ownDeviceId(),
+                        epoch = batch.first().epoch,
+                        envelopes = batch.map {
                             EnvelopeDto(
                                 it.recipientDeviceId.value,
                                 it.epoch,
@@ -70,7 +72,7 @@ class EnvelopeTransportImpl(
 
     /** Pulls envelopes addressed to us (online mode), acks them, returns for processing. */
     suspend fun fetchPending(channelId: ChannelId): Result<List<KeyEnvelope>> = try {
-        val remote = api.fetchKeyEnvelopes(channelId.value)
+        val remote = api.fetchKeyEnvelopes(channelId.value, ownDeviceId()).envelopes
         val envelopes = remote.map {
             KeyEnvelope(
                 channelId,
@@ -80,10 +82,12 @@ class EnvelopeTransportImpl(
                 java.util.Base64.getDecoder().decode(it.envelope_ciphertext),
             )
         }
-        api.ackKeyEnvelopes(
-            channelId.value,
-            AckEnvelopesRequest(remote.map { it.sender_device_id }.distinct(), remote.firstOrNull()?.epoch ?: 0),
-        )
+        if (remote.isNotEmpty()) {
+            api.ackKeyEnvelopes(
+                channelId.value,
+                AckEnvelopesRequest(remote.map { it.envelope_id }),
+            )
+        }
         Result.success(envelopes)
     } catch (e: Exception) {
         Result.failure(e)

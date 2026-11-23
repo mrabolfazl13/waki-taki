@@ -31,7 +31,9 @@ export function useSetUserDisabled() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, disabled }: { id: string; disabled: boolean }) =>
-      api(`/admin/users/${id}/disable`, z.unknown(), { method: "POST", body: { disabled } }),
+      api(`/admin/users/${id}/${disabled ? "disable" : "enable"}`, z.unknown(), {
+        method: "POST",
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }),
   });
 }
@@ -47,7 +49,9 @@ export function useDeleteChannel() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      api(`/admin/channels/${id}`, z.unknown(), { method: "DELETE" }),
+      // Admin endpoints expose only GET /admin/channels; deletion is the
+      // owner/admin-gated /channels/{id} route (ARCHITECTURE §5).
+      api(`/channels/${id}`, z.unknown(), { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "channels"] }),
   });
 }

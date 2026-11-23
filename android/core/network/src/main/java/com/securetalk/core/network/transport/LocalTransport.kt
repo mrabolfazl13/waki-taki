@@ -16,7 +16,8 @@ class LocalTransport(
     private val tokens: TokenManager,
     private var host: String = "127.0.0.1",
     private var port: Int = 53317,
-) : BaseWsTransport(client, scope) {
+    deviceId: String = "",
+) : BaseWsTransport(client, scope, deviceId) {
 
     fun updateEndpoint(newHost: String, newPort: Int) {
         host = newHost
@@ -24,7 +25,9 @@ class LocalTransport(
     }
 
     override fun buildRequest(): Request {
-        val url = "ws://$host:$port/api/v1/ws?token=${tokens.accessToken ?: ""}"
+        // LocalHostServer authenticates by device_id, not by an internet JWT.
+        val id = deviceId.ifBlank { "unknown-device" }
+        val url = "ws://$host:$port/api/v1/ws?device_id=$id"
         return Request.Builder().url(url).build()
     }
 }

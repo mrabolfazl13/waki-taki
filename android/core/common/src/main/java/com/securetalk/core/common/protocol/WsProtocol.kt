@@ -18,6 +18,8 @@ import kotlinx.serialization.json.put
  */
 
 sealed interface WsCommand {
+    /** Required by the backend before floor/signaling/media (§6). */
+    data class Join(val channelId: ChannelId, val deviceId: DeviceId) : WsCommand
     data class FloorRequest(val channelId: ChannelId) : WsCommand
     data class FloorRelease(val channelId: ChannelId) : WsCommand
     data class FloorOverride(val channelId: ChannelId) : WsCommand
@@ -34,6 +36,8 @@ sealed interface WsCommand {
 }
 
 sealed interface WsEvent {
+    /** Server/local-host acknowledgement of a successful channel join. */
+    data class Joined(val channelId: ChannelId, val deviceId: DeviceId, val epoch: Long) : WsEvent
     data class PresenceUpdate(val channelId: ChannelId, val deviceId: DeviceId, val state: String) : WsEvent
     data class FloorGranted(val channelId: ChannelId, val holder: DeviceId, val leaseExpiresMs: Long) : WsEvent
     data class FloorDenied(
@@ -71,6 +75,13 @@ object WsProtocol {
     fun encode(command: WsCommand): String {
         val type: String
         val data: JsonObject = when (command) {
+            is WsCommand.Join -> {
+                type = "join"
+                buildJsonObject {
+                    put("channel_id", command.channelId.value)
+                    put("device_id", command.deviceId.value)
+                }
+            }
             is WsCommand.FloorRequest -> {
                 type = "floor.request"
                 buildJsonObject { put("channel_id", command.channelId.value) }
@@ -85,15 +96,15 @@ object WsProtocol {
             }
             is WsCommand.SignalOffer -> {
                 type = "signaling.offer"
-                signalData(command.channelId, command.target, command.sdp)
+                signalData(command.channelId, command.target, command.sdp, "sdp")
             }
             is WsCommand.SignalAnswer -> {
                 type = "signaling.answer"
-                signalData(command.channelId, command.target, command.sdp)
+                signalData(command.channelId, command.target, command.sdp, "sdp")
             }
             is WsCommand.SignalIce -> {
                 type = "signaling.ice"
-                signalData(command.channelId, command.target, command.ice)
+                signalData(command.channelId, command.target, command.ice, "ice")
             }
             is WsCommand.KeyEnvelopeRelay -> {
                 type = "keys.envelope"
@@ -115,11 +126,12 @@ object WsProtocol {
         })
     }
 
-    private fun signalData(channelId: ChannelId, target: DeviceId, payload: String): JsonObject =
+    private fun signalData(channelId: ChannelId, target: DeviceId, payload: String, key: String): JsonObject =
         buildJsonObject {
             put("channel_id", channelId.value)
             put("target_device_id", target.value)
-            put("payload", payload)
+            // Backend relays `sdp` / `ice` verbatim (hub._relay_signaling).
+            put(key, payload)
         }
 
     fun decode(text: String): WsEvent? {
@@ -135,6 +147,11 @@ object WsProtocol {
         fun int(key: String): Int? = data[key]?.jsonPrimitive?.contentOrNullCompat()?.toIntOrNull()
 
         return when (type) {
+            "joined" -> WsEvent.Joined(
+                ChannelId(str("channel_id") ?: return null),
+                DeviceId(str("device_id") ?: return null),
+                long("epoch") ?: 0L,
+            )
             "presence.update" -> WsEvent.PresenceUpdate(
                 ChannelId(str("channel_id") ?: return null),
                 DeviceId(str("device_id") ?: return null),
@@ -171,17 +188,21 @@ object WsProtocol {
             )
             "channel.event" -> WsEvent.ChannelEvent(
                 ChannelId(str("channel_id") ?: return null),
-                runCatching {
-                    WsEvent.ChannelEventKind.valueOf(
-                        (str("kind") ?: "MEMBER_JOINED").uppercase().replace("member_joined", "MEMBER_JOINED"),
-                    )
-                }.getOrDefault(WsEvent.ChannelEventKind.MEMBER_JOINED),
+                channelEventKind(str("event") ?: str("kind")),
                 str("detail") ?: "",
             )
             "pong" -> WsEvent.Pong
             "error" -> WsEvent.Error(str("code") ?: "error", str("message") ?: "")
             else -> null
         }
+    }
+
+    private fun channelEventKind(raw: String?): WsEvent.ChannelEventKind = when (raw?.lowercase()) {
+        "epoch_rotated" -> WsEvent.ChannelEventKind.EPOCH_ROTATED
+        "member_joined", "joined" -> WsEvent.ChannelEventKind.MEMBER_JOINED
+        "member_left", "left" -> WsEvent.ChannelEventKind.MEMBER_LEFT
+        "member_removed", "removed" -> WsEvent.ChannelEventKind.MEMBER_REMOVED
+        else -> WsEvent.ChannelEventKind.MEMBER_JOINED
     }
 
     private fun signal(
@@ -194,7 +215,8 @@ object WsProtocol {
         channelId(str("channel_id") ?: ""),
         deviceId(str("sender_device_id") ?: str("from_device_id") ?: ""),
         kind,
-        str("payload") ?: "",
+        // Backend sends sdp/ice, not a generic payload field.
+        str("sdp") ?: str("ice") ?: str("payload") ?: "",
     )
 
     private fun kotlinx.serialization.json.JsonPrimitive.contentOrNullCompat(): String? =

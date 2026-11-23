@@ -21,7 +21,8 @@ class SettingsRepository(private val context: Context) {
         val onboarded: Boolean = false,
     ) {
         companion object {
-            const val DEFAULT_API_BASE_URL = "https://localhost/api/v1"
+            /** Server origin; REST/WS paths are appended by the transports. */
+            const val DEFAULT_API_BASE_URL = "https://localhost/"
         }
     }
 

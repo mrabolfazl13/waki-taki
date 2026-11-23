@@ -7,6 +7,7 @@ Backend reads ONLY the plaintext header (never stores/decrypts media).
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import struct
@@ -36,6 +37,7 @@ class Conn:
     role: str
     device_id: str | None = None
     channel_id: str | None = None
+    epoch: int | None = None
     tasks: list = field(default_factory=list)
 
 
@@ -61,20 +63,11 @@ class Hub:
     async def _pubsub_loop(self) -> None:
         while True:
             pubsub = None
-            pubsub_client = None
             try:
-                # Binary media frames must survive as bytes: prefer a pubsub
-                # that does not decode. redis-py's asyncio PubSub rejects the
-                # kwarg, so fall back to a dedicated non-decoding client.
-                try:
-                    pubsub = self.redis.pubsub(decode_responses=False)
-                except TypeError:
-                    from redis import asyncio as aioredis
-
-                    pubsub_client = aioredis.from_url(
-                        settings.redis_url, decode_responses=False
-                    )
-                    pubsub = pubsub_client.pubsub()
+                # Media payloads are base64 strings on the Redis wire, so a
+                # single normal pubsub client works with decode_responses=True
+                # (real Redis and fakeredis alike). No second client needed.
+                pubsub = self.redis.pubsub()
                 await pubsub.psubscribe("media:*", "events:*")
                 async for message in pubsub.listen():
                     if message["type"] != "pmessage":
@@ -100,11 +93,6 @@ class Hub:
                         await pubsub.close()
                     except Exception:
                         pass
-                if pubsub_client is not None:
-                    try:
-                        await pubsub_client.close()
-                    except Exception:
-                        pass
 
     # ---------- channel events (join/leave/epoch from REST) ----------
 
@@ -117,10 +105,12 @@ class Hub:
                 await safe_send(conn.ws, {"type": "channel.event", "data": json.loads(payload)})
 
     async def _on_remote_media(self, channel_id: str, payload) -> None:
-        # payload: b"instance_id\x00" + frame
-        if not isinstance(payload, (bytes, bytearray)):
+        # payload: base64(instance_id + b"\x00" + frame) — text-safe on the wire.
+        try:
+            raw = base64.b64decode(payload, validate=True)
+        except Exception:
+            log.warning("invalid remote media payload on %s", channel_id)
             return
-        raw = bytes(payload)
         origin, _, frame = raw.partition(b"\x00")
         if origin.decode(errors="replace") == INSTANCE_ID:
             return  # already fanned out locally
@@ -150,6 +140,25 @@ class Hub:
             return
         channel_id = conn.channel_id
 
+        # Epoch enforcement (ARCHITECTURE §3.3): stale ciphertext must never be
+        # relayed.  Refresh from DB only when the frame's epoch differs from the
+        # cached one (rotation publishes channel.event but media can race it).
+        if conn.epoch is None or epoch != conn.epoch:
+            async with self.session_factory() as session:
+                current = await session.get(Channel, channel_id)
+            current_epoch = current.epoch if current is not None else None
+            if current_epoch is not None:
+                conn.epoch = current_epoch
+            if epoch != current_epoch:
+                await safe_send(
+                    conn.ws,
+                    {"type": "error", "data": {
+                        "code": "epoch_mismatch", "expected": current_epoch, "received": epoch,
+                    }},
+                )
+                await self._record_security(channel_id, conn.user_id, "media.epoch_mismatch")
+                return
+
         # Floor ownership: only the current floor holder may transmit.
         state = await floor.floor_state(self.redis, channel_id)
         if state["holder_device_id"] != conn.device_id:
@@ -174,9 +183,10 @@ class Hub:
 
         await self._fanout_media(channel_id, data, exclude_device=conn.device_id)
         # Cross-instance fan-out (publisher identity prefix avoids echo).
-        await self.redis.publish(
-            f"media:{channel_id}", INSTANCE_ID.encode() + b"\x00" + data
-        )
+        # base64 keeps binary frames intact even when the Redis connection
+        # decodes responses as text.
+        wire = base64.b64encode(INSTANCE_ID.encode() + b"\x00" + data).decode("ascii")
+        await self.redis.publish(f"media:{channel_id}", wire)
 
     async def _record_security(self, channel_id: str, user_id: str, type: str) -> None:
         try:
@@ -229,8 +239,12 @@ class Hub:
             await self._cleanup(conn)
 
     async def _cleanup(self, conn: Conn) -> None:
-        if conn.device_id and self.conns.get(conn.device_id) is conn:
-            del self.conns[conn.device_id]
+        # A newer socket for the same device supersedes this one: tearing down
+        # presence/floor here would evict the live session.
+        if conn.device_id and self.conns.get(conn.device_id) is not conn:
+            return
+        if conn.device_id:
+            self.conns.pop(conn.device_id, None)
         if conn.channel_id and conn.device_id:
             await self.redis.srem(f"presence:{conn.channel_id}", conn.device_id)
             await self.publish_event(
@@ -290,6 +304,9 @@ class Hub:
             return
         conn.device_id = device_id
         conn.channel_id = channel_id
+        conn.epoch = channel.epoch
+        # A newer connection for the same device supersedes the old one; the
+        # old socket's cleanup will skip presence/floor teardown.
         self.conns[device_id] = conn
         await self.redis.sadd(f"presence:{channel_id}", device_id)
         await self.redis.hset(

@@ -46,6 +46,14 @@ class SecureSessionManagerImpl(
         val bundle = remoteBundle ?: bundleDirectory.bundleFor(peer).getOrNull()
             ?: return Result.failure(IllegalStateException("No prekey bundle for $peer"))
 
+        // §3.1/§3.2: authenticate the signed prekey with the peer's Ed25519
+        // identity key BEFORE deriving any DH material. Fail closed.
+        val verifyKey = bundle.identityEd25519Pub
+            ?: return Result.failure(IllegalStateException("Missing Ed25519 identity key for $peer"))
+        if (!identityManager.verifyPrekeySignature(bundle, verifyKey)) {
+            return Result.failure(SecurityException("Invalid prekey signature for $peer"))
+        }
+
         val bundleData = identityManager.ensureIdentity()
         val (sk, envelope) = X3dhLite.initiate(engine, bundleData.identity.x25519Private, bundle)
         val ratchet = DoubleRatchetLite(engine)

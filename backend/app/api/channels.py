@@ -13,9 +13,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
+from ..core.flags import effective_flags
 from ..core.ratelimit import check_rate_limit
 from ..deps import get_current_user, get_db, get_redis, record_security_event
-from ..models import Channel, Invite, MemberRole, Membership, Role, User, utcnow
+from ..models import Channel, Device, Invite, MemberRole, Membership, Role, User, utcnow
 from ..schemas import (
     ChannelIn,
     ChannelOut,
@@ -28,7 +29,10 @@ from ..schemas import (
 router = APIRouter(prefix="/channels", tags=["channels"])
 settings = get_settings()
 
-_invite_secret = secrets.token_bytes(32)  # per-process HMAC key for code hashing
+# Must be identical on every API instance: invites issued by one replica have
+# to validate on another.  The dedicated env var is optional; the shared JWT
+# secret is the default so a normal single-secret deployment just works.
+_invite_secret = (settings.invite_secret or settings.jwt_secret).encode()
 
 
 def _hash_code(code: str) -> str:
@@ -112,6 +116,8 @@ async def join_channel(
 ) -> ChannelOut:
     if not await check_rate_limit(redis, f"invite_join:{user.id}", settings.invite_join_rate_limit, settings.auth_rate_window_seconds):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "rate_limited")
+    if (await effective_flags(session))["maintenance_mode"]:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "maintenance_mode")
     channel = await session.get(Channel, channel_id)
     if channel is None or channel.deleted_at is not None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "channel_not_found")
@@ -162,6 +168,38 @@ async def join_channel(
     )
 
 
+@router.get("/{channel_id}/members")
+async def channel_members(
+    channel_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """Roster for key discovery: user/device mapping + roles (no key material)."""
+    membership = await session.scalar(
+        select(Membership).where(
+            Membership.channel_id == channel_id, Membership.user_id == user.id
+        )
+    )
+    channel = await session.get(Channel, channel_id)
+    if channel is None or channel.deleted_at is not None or membership is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "not_a_member")
+    rows = await session.execute(
+        select(Membership, User, Device)
+        .join(User, Membership.user_id == User.id)
+        .join(Device, Device.user_id == User.id)
+        .where(Membership.channel_id == channel_id, Device.revoked_at.is_(None))
+    )
+    return [
+        {
+            "user_id": member.user_id,
+            "device_id": device.id,
+            "display_name": account.display_name,
+            "role": "owner" if channel.owner_id == member.user_id else member.role.value,
+        }
+        for member, account, device in rows
+    ]
+
+
 @router.post("/{channel_id}/leave", status_code=204)
 async def leave_channel(
     channel_id: str,
@@ -197,6 +235,9 @@ async def create_invite(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "channel_not_found")
     if membership is None and user.role != Role.ADMIN:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not_a_member")
+    flags = await effective_flags(session)
+    if flags["maintenance_mode"] or not flags["invite_creation_enabled"]:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "invite_creation_disabled")
     if not await check_rate_limit(redis, f"invite_create:{user.id}", settings.invite_create_rate_limit, settings.auth_rate_window_seconds):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "rate_limited")
     code = secrets.token_urlsafe(24)

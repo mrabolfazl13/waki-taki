@@ -43,6 +43,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -118,7 +119,19 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun baseUrl(): BaseUrl = BaseUrl("https://localhost/api/v1")
+    fun baseUrl(settingsRepository: com.securetalk.core.database.data.SettingsRepository): BaseUrl {
+        val configured = kotlinx.coroutines.runBlocking {
+            settingsRepository.settings.first().apiBaseUrl
+        }
+        return BaseUrl(normalizeApiOrigin(configured))
+    }
+
+    /** Accept both legacy ".../api/v1" values and plain origins; always end in '/'. */
+    private fun normalizeApiOrigin(url: String): String {
+        val trimmed = url.trim()
+        val origin = trimmed.substringBefore("/api/v1").trimEnd('/')
+        return if (origin.startsWith("http://") || origin.startsWith("https://")) "$origin/" else "https://localhost/"
+    }
 
     class BaseUrl(url: String) {
         @Volatile var value: String = url
@@ -128,6 +141,8 @@ object AppModule {
     @Singleton
     fun restApi(baseUrl: BaseUrl, tokens: TokenManager, scope: CoroutineScope): SecureTalkApi {
         val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        // BaseUrl now holds the server origin; the versioned REST prefix is placed here.
+        val restBaseUrl = baseUrl.value.trimEnd('/') + "/api/v1/"
         // Retrofit uses its own client with auth headers; token refresh reuses a bare client
         // to avoid a circular construction between Retrofit and OkHttpClient.
         val baseClient = OkHttpClient.Builder()
@@ -136,7 +151,7 @@ object AppModule {
             .addInterceptor(AuthInterceptor(tokens))
             .build()
         val retrofit = Retrofit.Builder()
-            .baseUrl(baseUrl.value)
+            .baseUrl(restBaseUrl)
             .client(baseClient)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
@@ -163,13 +178,18 @@ object AppModule {
         tokens: TokenManager,
         api: SecureTalkApi,
         baseUrl: BaseUrl,
-    ): OnlineTransport = OnlineTransport(wsClient, scope, api, tokens, baseUrl.value)
+        own: OwnDeviceId,
+    ): OnlineTransport = OnlineTransport(wsClient, scope, api, tokens, baseUrl.value, own.value)
 
     @Provides
     @Singleton
     @LocalTransportQualifier
-    fun localTransport(wsClient: OkHttpClient, scope: CoroutineScope, tokens: TokenManager): LocalTransport =
-        LocalTransport(wsClient, scope, tokens)
+    fun localTransport(
+        wsClient: OkHttpClient,
+        scope: CoroutineScope,
+        tokens: TokenManager,
+        own: OwnDeviceId,
+    ): LocalTransport = LocalTransport(wsClient, scope, tokens, deviceId = own.value)
 
     /**
      * Mode-aware transport: merges both underlying transports' event streams and
@@ -259,12 +279,16 @@ object AppModule {
         api: SecureTalkApi,
         db: com.securetalk.core.database.SecureTalkDatabase,
         identity: DeviceIdentityManager,
+        auth: AuthRepository,
     ): ChannelManagerImpl = ChannelManagerImpl(
         api,
         db.channelDao(),
         db.memberDao(),
-        ownUserId = { "" }, // server supplies membership; user id not needed client-side beyond display
+        // The backend compares owner_id to the authenticated user id; using ""
+        // would mark every channel as not owned. AuthRepository holds the id.
+        ownUserId = { auth.session.value.userId },
         isLocalMode = { false },
+        auth = auth,
     )
 
     @Provides

@@ -87,7 +87,8 @@ class DefaultPushToTalkController(
         val outcome = withTimeoutOrNull(requestTimeoutMs) {
             transport.events.first { event ->
                 when (event) {
-                    is WsEvent.FloorGranted -> event.channelId == channelId
+                    // Never start transmitting for someone else's grant.
+            is WsEvent.FloorGranted -> event.channelId == channelId && event.holder == ownDeviceId
                     is WsEvent.FloorDenied -> event.channelId == channelId
                     else -> false
                 }

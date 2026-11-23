@@ -9,7 +9,10 @@ import com.securetalk.core.network.auth.TokenManager
 import com.securetalk.core.security.session.DeviceIdentityManager
 import com.securetalk.core.security.session.PreKeyBundleDirectory
 import com.securetalk.core.common.model.DeviceId
+import com.securetalk.core.common.model.Member
 import com.securetalk.core.common.model.PreKeyBundleData
+import com.securetalk.core.common.model.UserId
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +37,18 @@ class AuthRepository(
 
     private val _session = MutableStateFlow(SessionInfo("", "", "", authenticated = false))
     val session: StateFlow<SessionInfo> = _session.asStateFlow()
+
+    /** device id -> owning user id, learned from channel rosters (§5 key discovery). */
+    private val deviceUsers = ConcurrentHashMap<String, String>()
+
+    /** Called by ChannelManagerImpl whenever a member roster is fetched/refreshed. */
+    fun rememberMembers(members: List<Member>) {
+        members.forEach { deviceUsers[it.deviceId.value] = it.userId.value }
+    }
+
+    fun rememberSelf(userId: String, deviceId: String) {
+        deviceUsers[deviceId] = userId
+    }
 
     suspend fun register(displayName: String, password: String?): Result<SessionInfo> = try {
         val response = api.register(RegisterRequest(displayName, password))
@@ -62,8 +77,19 @@ class AuthRepository(
     private suspend fun applyAuth(displayName: String, response: com.securetalk.core.network.api.AuthResponse): Result<SessionInfo> {
         tokens.update(response.access_token, response.refresh_token, response.expires_in)
         val deviceId = response.device_id ?: registerDevice()
-        _session.value = SessionInfo(response.user_id, deviceId, displayName, authenticated = true)
+        // TokenPair does not echo user_id; read `sub` from the server-issued JWT.
+        val userId = response.user_id.ifBlank { subjectFromJwt(response.access_token) }
+        _session.value = SessionInfo(userId, deviceId, displayName, authenticated = true)
+        rememberSelf(userId, deviceId)
         return Result.success(_session.value)
+    }
+
+    private fun subjectFromJwt(token: String): String = try {
+        val payload = token.split('.')[1]
+        val decoded = String(java.util.Base64.getUrlDecoder().decode(payload), Charsets.UTF_8)
+        Regex("\"sub\"\\s*:\\s*\"([^\"]+)\"").find(decoded)?.groupValues?.get(1) ?: ""
+    } catch (_: Exception) {
+        ""
     }
 
     /** Publishes this device's identity + prekeys (§3.1) — required before key distribution. */
@@ -84,13 +110,29 @@ class AuthRepository(
     }
 
     override suspend fun bundleFor(deviceId: DeviceId): Result<PreKeyBundleData?> = try {
-        val bundles = api.myDevices() // local device bundles; remote lookup by user keys:
-        val local = bundles.firstOrNull { it.device_id == deviceId.value }
-        if (local != null) {
-            Result.success(toBundle(local))
-        } else {
-            Result.success(null)
+        // Peer bundles live at GET /users/{user_id}/keys (ARCHITECTURE §5).
+        // The device -> user mapping comes from the channel roster.
+        val userId = deviceUsers[deviceId.value]
+        if (userId != null) {
+            val remote = api.userKeys(userId).firstOrNull { it.device_id == deviceId.value }
+            if (remote != null) {
+                return Result.success(
+                    PreKeyBundleData(
+                        deviceId = DeviceId(remote.device_id),
+                        identitySigningPub = unhex(remote.identity_pubkey), // X25519 identity point
+                        identityEd25519Pub = unhex(remote.signing_pubkey),  // Ed25519 verify key
+                        signedPrekeyPub = unhex(remote.signed_prekey),
+                        prekeySignature = unhex(remote.prekey_signature),
+                        oneTimePrekeyPub = remote.one_time_prekey?.let { unhex(it.pubkey) },
+                        oneTimePrekeyId = remote.one_time_prekey?.key_id,
+                    ),
+                )
+            }
         }
+        // Fallback for our own devices: GET /devices (public metadata only;
+        // one-time prekeys are not returned there).
+        val local = api.myDevices().firstOrNull { it.device_id == deviceId.value }
+        Result.success(local?.let(::toBundle))
     } catch (e: Exception) {
         Result.failure(e)
     }
@@ -99,6 +141,7 @@ class AuthRepository(
         PreKeyBundleData(
             deviceId = DeviceId(local.device_id),
             identitySigningPub = unhex(local.identity_pubkey),
+            identityEd25519Pub = unhex(local.signing_pubkey),
             signedPrekeyPub = unhex(local.signed_prekey),
             prekeySignature = unhex(local.prekey_signature),
         )

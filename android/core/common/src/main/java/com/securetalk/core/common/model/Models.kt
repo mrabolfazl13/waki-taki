@@ -131,6 +131,8 @@ class PreKeyBundleData(
     val prekeySignature: ByteArray,      // Ed25519 signature over signedPrekeyPub
     val oneTimePrekeyPub: ByteArray? = null,
     val oneTimePrekeyId: Long? = null,
+    /** Ed25519 verify key for the remote identity; required to authenticate the signed prekey. */
+    val identityEd25519Pub: ByteArray? = null,
 )
 
 enum class TransportState { DISCONNECTED, CONNECTING, CONNECTED, RECONNECTING }

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
+from ..core.flags import effective_flags
 from ..core.ratelimit import check_rate_limit
 from ..core.security import (
     TokenError,
@@ -57,6 +58,9 @@ async def register(
 ) -> TokenPair:
     if not await check_rate_limit(redis, f"auth:{request.client.host if request.client else "na"}", settings.auth_rate_limit, settings.auth_rate_window_seconds):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "rate_limited")
+    flags = await effective_flags(session)
+    if flags["maintenance_mode"] or not flags["registration_enabled"]:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "registration_disabled")
     existing = await session.scalar(select(User).where(User.display_name == body.display_name))
     if existing is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "display_name_taken")

@@ -9,7 +9,8 @@ from ..models import User
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health")
+@router.get("/health", include_in_schema=False)
+@router.get("/api/v1/health")
 async def health() -> dict:
     return {"status": "ok"}
 

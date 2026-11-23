@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { api } from "../lib/api";
+import { api, apiPublic } from "../lib/api";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -18,10 +18,12 @@ interface ProbeResult {
 }
 
 /** Measures real HTTP round-trip time from the browser to the backend. */
-async function probe(path: string): Promise<ProbeResult> {
+async function probe(path: string, isPublic = false): Promise<ProbeResult> {
   const start = performance.now();
   try {
-    await api(path, livenessSchema);
+    // /health lives at the root, not under /api/v1.
+    if (isPublic) await apiPublic(path, livenessSchema);
+    else await api(path, livenessSchema);
     return { path, latencyMs: Math.round(performance.now() - start), ok: true, httpStatus: 200 };
   } catch (err) {
     const status = err && typeof err === "object" && "status" in err ? (err as { status: number }).status : null;
@@ -36,7 +38,7 @@ export default function NetworkDiagnosticsPage() {
   // Background reachability of the public liveness endpoint.
   const liveness = useQuery({
     queryKey: ["diagnostics", "health-probe"],
-    queryFn: () => api("/health", livenessSchema),
+    queryFn: () => apiPublic("/health", livenessSchema),
     retry: false,
     refetchInterval: 30000,
   });
@@ -45,7 +47,7 @@ export default function NetworkDiagnosticsPage() {
     setBusy(true);
     const results: ProbeResult[] = [];
     for (const path of ["/health", "/admin/health", "/admin/users"]) {
-      results.push(await probe(path));
+      results.push(await probe(path, path === "/health"));
     }
     setProbes(results);
     setBusy(false);

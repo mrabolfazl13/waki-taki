@@ -78,10 +78,11 @@ class ReplayWindowTest {
     @Test
     fun `rejects sequences too far in the past`() {
         val w = ReplayWindow(128)
-        repeat(200) { w.accept(it.toLong()) }
+        repeat(200) { w.accept(it.toLong()) } // consumes seq 0..199
         assertFalse(w.accept(0))
-        assertTrue(w.accept(199)) // new (not replay)
-        assertFalse(w.accept(199)) // replay
+        assertFalse(w.accept(199)) // already consumed above (replay)
+        assertTrue(w.accept(200)) // new (not replay)
+        assertFalse(w.accept(200)) // replay
         assertTrue(w.accept(201))
     }
 }

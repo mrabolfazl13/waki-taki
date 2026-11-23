@@ -28,6 +28,23 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ST_JWT_SECRET", "JWT_SECRET", "SECRET_KEY"),
     )
     jwt_algorithm: str = "HS256"
+
+    # Deployment environment. Production refuses to start with placeholder
+    # secrets / insecure developer conveniences (see main._assert_prod_settings).
+    environment: str = Field(
+        default="dev", validation_alias=AliasChoices("ST_ENVIRONMENT", "ENVIRONMENT")
+    )
+
+    # HMAC key for invite-code hashing. Must be shared by every API instance;
+    # falls back to jwt_secret so a single shared secret is enough by default.
+    invite_secret: str | None = Field(
+        default=None, validation_alias=AliasChoices("ST_INVITE_SECRET", "INVITE_SECRET")
+    )
+
+    # Comma-separated browser origins allowed by CORS (empty = same-origin only).
+    allowed_origins: str = Field(
+        default="", validation_alias=AliasChoices("ST_ALLOWED_ORIGINS", "ALLOWED_ORIGINS")
+    )
     access_token_minutes: int = 15
     refresh_token_days: int = 30
 

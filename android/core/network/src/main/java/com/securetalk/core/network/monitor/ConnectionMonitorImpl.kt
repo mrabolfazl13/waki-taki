@@ -141,7 +141,8 @@ class ConnectionMonitorImpl(
                 setState(ConnectionState.RECONNECTING)
                 probeLocalHosts()
                 if (_localHosts.value.isNotEmpty()) {
-                    setState(ConnectionState.LOCAL_AVAILABLE)
+                    // Do NOT enter LOCAL_AVAILABLE here: discovery is not consent.
+                    // Stay RECONNECTING until the user confirms the switch (§8).
                     val decision = ConnectionTransition.RequiresUserDecision(
                         reason = "Internet connection lost. Local SecureTalk hosts found nearby — switch to offline mode? (security sessions will be re-established)",
                         localHosts = _localHosts.value,

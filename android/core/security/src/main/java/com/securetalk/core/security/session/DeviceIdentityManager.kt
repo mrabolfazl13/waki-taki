@@ -108,6 +108,7 @@ class DeviceIdentityManager(
             prekeySignature = b.signedPreKey.signature,
             oneTimePrekeyPub = otp?.public,
             oneTimePrekeyId = otp?.id,
+            identityEd25519Pub = b.identity.ed25519Public,
         )
     }
 

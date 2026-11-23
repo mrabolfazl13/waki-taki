@@ -3,6 +3,9 @@ backend/.venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+backend/test.db
+backend/test_ws.db
+backend/live.db
 
 # Node
 web/node_modules/

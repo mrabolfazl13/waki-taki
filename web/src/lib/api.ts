@@ -4,6 +4,8 @@ import { tokenPairSchema } from "./schemas";
 const BASE = "/api/v1";
 const ACCESS_KEY = "securetalk.admin.access";
 const REFRESH_KEY = "securetalk.admin.refresh";
+/** Emitted when tokens are cleared after a failed refresh; AuthProvider listens. */
+export const AUTH_INVALIDATED = "securetalk:auth-invalidated";
 
 export class ApiError extends Error {
   status: number;
@@ -91,8 +93,13 @@ export async function api<T>(
       res = await doFetch(getAccessToken());
     } else {
       clearTokens();
+      window.dispatchEvent(new Event(AUTH_INVALIDATED));
       throw new ApiError(401, "Session expired. Please sign in again.");
     }
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
   }
 
   if (!res.ok) {
@@ -119,6 +126,19 @@ export async function api<T>(
   return parsed.data;
 }
 
+/**
+ * Public endpoint call without the /api/v1 prefix (e.g. GET /health).
+ * No auth header, no refresh retry — liveness probes must never mutate session state.
+ */
+export async function apiPublic<T>(path: string, schema: z.ZodType<T>): Promise<T> {
+  const res = await fetch(path, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new ApiError(res.status, `Request failed (${res.status})`);
+  if (res.status === 204) return undefined as T;
+  const parsed = schema.safeParse(await res.json());
+  if (!parsed.success) throw new ApiError(res.status, "Response did not match the expected API schema", true);
+  return parsed.data;
+}
+
 export async function login(displayName: string, password: string): Promise<void> {
   const pair = await api(
     "/auth/login",
@@ -129,8 +149,17 @@ export async function login(displayName: string, password: string): Promise<void
 }
 
 export async function logout(): Promise<void> {
+  const refresh = getRefreshToken();
   try {
-    await api("/auth/logout", z.unknown(), { method: "POST", noAuth: true });
+    // Backend requires the refresh token in the body; otherwise 422 and the
+    // server-side session (refresh jti) would remain valid after local logout.
+    if (refresh) {
+      await api("/auth/logout", z.unknown(), {
+        method: "POST",
+        body: { refresh_token: refresh },
+        noAuth: true,
+      });
+    }
   } catch {
     /* best effort */
   }

@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from .api import admin, auth, channels, devices, health, keys, users
 from .core.config import get_settings
@@ -19,6 +20,27 @@ setup_logging(settings.log_level)
 log = logging.getLogger("securetalk.main")
 
 
+def _assert_prod_settings() -> None:
+    """Fail closed when a production deployment keeps developer defaults."""
+    if settings.environment.lower() not in {"prod", "production"}:
+        return
+    placeholder_secrets = {
+        "dev-secret-change-me",
+        "change_me_generate_with_secrets_token_urlsafe",
+        "change_me",
+        "",
+    }
+    problems: list[str] = []
+    if settings.jwt_secret in placeholder_secrets or len(settings.jwt_secret) < 32:
+        problems.append("JWT_SECRET must be a strong random value (>= 32 chars)")
+    if settings.bootstrap_admin_enabled:
+        problems.append("BOOTSTRAP_ADMIN_ENABLED must be false (provision admins explicitly)")
+    if settings.auto_create_tables:
+        problems.append("AUTO_CREATE_TABLES must be false (use Alembic migrations)")
+    if problems:
+        raise RuntimeError("unsafe production configuration: " + "; ".join(problems))
+
+
 def create_app() -> FastAPI:
     from . import deps as _deps
 
@@ -31,6 +53,7 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        _assert_prod_settings()
         if settings.auto_create_tables:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
@@ -71,6 +94,15 @@ def create_app() -> FastAPI:
         await engine.dispose()
 
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
+    origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
+    if origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type"],
+        )
     app.include_router(health.router)
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(devices.router, prefix="/api/v1")

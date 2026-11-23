@@ -6,6 +6,7 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * REST client for the API contract in ARCHITECTURE §5 (base /api/v1).
@@ -75,7 +76,10 @@ interface SecureTalkApi {
     suspend fun distributeKeys(@Path("id") channelId: String, @Body body: DistributeKeysRequest): retrofit2.Response<Unit>
 
     @GET("channels/{id}/keys/envelopes")
-    suspend fun fetchKeyEnvelopes(@Path("id") channelId: String): List<KeyEnvelopeResponse>
+    suspend fun fetchKeyEnvelopes(
+        @Path("id") channelId: String,
+        @Query("device_id") deviceId: String,
+    ): KeyEnvelopesResponse
 
     @POST("channels/{id}/keys/ack")
     suspend fun ackKeyEnvelopes(@Path("id") channelId: String, @Body body: AckEnvelopesRequest): retrofit2.Response<Unit>
@@ -102,11 +106,14 @@ data class RefreshRequest(val refresh_token: String)
 
 @Serializable
 data class AuthResponse(
-    val user_id: String,
+    // Backend TokenPair carries only the two tokens; the remaining fields are
+    // optional so deserialization never fails against the real contract.
+    val user_id: String = "",
     val device_id: String? = null,
     val access_token: String,
     val refresh_token: String,
-    val expires_in: Long,
+    val expires_in: Long = 900L,
+    val token_type: String? = null,
 )
 
 @Serializable
@@ -178,7 +185,11 @@ data class MemberResponse(
 )
 
 @Serializable
-data class DistributeKeysRequest(val envelopes: List<EnvelopeDto>)
+data class DistributeKeysRequest(
+    val sender_device_id: String,
+    val epoch: Long,
+    val envelopes: List<EnvelopeDto>,
+)
 
 @Serializable
 data class EnvelopeDto(
@@ -189,13 +200,17 @@ data class EnvelopeDto(
 
 @Serializable
 data class KeyEnvelopeResponse(
+    val envelope_id: Int,
     val sender_device_id: String,
     val epoch: Long,
     val envelope_ciphertext: String,
 )
 
 @Serializable
-data class AckEnvelopesRequest(val sender_device_ids: List<String>, val epoch: Long)
+data class KeyEnvelopesResponse(val envelopes: List<KeyEnvelopeResponse>)
+
+@Serializable
+data class AckEnvelopesRequest(val envelope_ids: List<Int>)
 
 @Serializable
 data class EpochResponse(val epoch: Long)

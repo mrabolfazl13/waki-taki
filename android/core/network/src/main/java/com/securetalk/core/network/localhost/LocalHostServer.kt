@@ -48,6 +48,8 @@ class LocalHostServer(private val scope: CoroutineScope) {
 
     /** deviceId -> outgoing WS session. */
     private val sessions = ConcurrentHashMap<String, WebSocketSession>()
+    /** deviceId -> channels it joined (used to scope media fan-out). */
+    private val deviceChannels = ConcurrentHashMap<String, MutableSet<String>>()
     private var engine: ApplicationEngine? = null
     private val startedAt = AtomicLong(0)
 
@@ -107,6 +109,7 @@ class LocalHostServer(private val scope: CoroutineScope) {
                     // normal disconnect
                 } finally {
                     sessions.remove(deviceId, this)
+                    deviceChannels.remove(deviceId)
                     handleDeviceLeft(deviceId)
                 }
             }
@@ -125,6 +128,17 @@ class LocalHostServer(private val scope: CoroutineScope) {
 
         when (type) {
             "ping" -> sendTo(senderId, """{"type":"pong","data":{}}""")
+
+            "join" -> {
+                val channelId = str("channel_id")
+                if (channelId.isNotBlank()) {
+                    deviceChannels.computeIfAbsent(senderId) { ConcurrentHashMap.newKeySet() }.add(channelId)
+                    sendTo(
+                        senderId,
+                        """{"type":"joined","data":{"channel_id":"$channelId","device_id":"$senderId","epoch":1,"present":[]}}""",
+                    )
+                }
+            }
 
             "floor.request" -> {
                 val channelId = str("channel_id")
@@ -184,15 +198,20 @@ class LocalHostServer(private val scope: CoroutineScope) {
     private suspend fun handleBinary(senderId: String, bytes: ByteArray) {
         // Parse ONLY the plaintext header (epoch|sender|seq); the ciphertext is opaque.
         // Authorization: only the current floor holder on some channel may transmit (§6).
-        try {
+        val packet = try {
             MediaPacketCodec.decode(bytes)
         } catch (_: Exception) {
             return
         }
+        // Header sender must match the authenticated socket, and the sender
+        // must actually hold the floor (§6).
+        if (packet.sender.value != senderId) return
         if (!floor.holders().containsValue(senderId)) return
 
+        val senderChannels = deviceChannels[senderId].orEmpty()
         sessions.entries
             .filter { it.key != senderId }
+            .filter { (deviceChannels[it.key].orEmpty() intersect senderChannels).isNotEmpty() }
             .forEach { runCatching { it.value.send(Frame.Binary(true, bytes)) } }
     }
 

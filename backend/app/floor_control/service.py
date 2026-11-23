@@ -90,10 +90,14 @@ async def request_floor(
                     await pipe.execute()
                     return FloorResult(granted=True, holder_device_id=device_id, lease_expires_ms=lease_expires)
                 if holder is not None:
-                    qpos = int(await redis.llen(queue_key(channel_id))) + 1
+                    qkey = queue_key(channel_id)
+                    # A device may be queued only once (heartbeat re-requests
+                    # must not inflate the queue or gain extra grants).
+                    await redis.lrem(qkey, 0, device_id)
+                    qpos = int(await redis.llen(qkey)) + 1
                     if qpos > settings.floor_queue_depth:
                         return FloorResult(granted=False, reason="queue_full", holder_device_id=holder)
-                    await redis.lpush(queue_key(channel_id), device_id)
+                    await redis.lpush(qkey, device_id)
                     return FloorResult(
                         granted=False, reason="busy", holder_device_id=holder, queue_position=qpos
                     )
@@ -113,26 +117,43 @@ async def request_floor(
                 continue  # concurrent request lost: retry (receive order preserved by Redis CAS)
 
 
+def _as_str(value) -> str:
+    return value.decode() if isinstance(value, (bytes, bytearray)) else str(value)
+
+
 async def release_floor(redis, channel_id: str, device_id: str) -> str | None:
-    """Release if holder. Returns next granted device id from queue, if any."""
+    """Atomically release the floor and promote the next queued device.
+
+    WATCH/MULTI prevents two concurrent releases from both granting a lease.
+    """
     key = floor_key(channel_id)
-    holder = await redis.hget(key, "holder_device_id")
-    if not holder or holder != device_id:
-        return None
-    await redis.delete(key)
-    nxt = await redis.rpop(queue_key(channel_id))
-    if nxt:
-        lease_expires = _now_ms() + settings.floor_lease_seconds * 1000
-        await redis.hset(
-            key,
-            mapping={
-                "holder_device_id": nxt,
-                "expires_at_ms": str(lease_expires),
-                "granted_at_ms": str(_now_ms()),
-            },
-        )
-        return nxt
-    return None
+    qkey = queue_key(channel_id)
+    async with redis.pipeline(transaction=True) as pipe:
+        while True:
+            try:
+                await pipe.watch(key)
+                holder = await pipe.hget(key, "holder_device_id")
+                if not holder or _as_str(holder) != device_id:
+                    return None
+                queued = await pipe.lrange(qkey, -1, -1)
+                nxt = _as_str(queued[0]) if queued else None
+                pipe.multi()
+                await pipe.delete(key)
+                await pipe.rpop(qkey)
+                if nxt:
+                    lease_expires = _now_ms() + settings.floor_lease_seconds * 1000
+                    await pipe.hset(
+                        key,
+                        mapping={
+                            "holder_device_id": nxt,
+                            "expires_at_ms": str(lease_expires),
+                            "granted_at_ms": str(_now_ms()),
+                        },
+                    )
+                await pipe.execute()
+                return nxt
+            except WatchError:
+                continue
 
 
 async def floor_state(redis, channel_id: str) -> dict:

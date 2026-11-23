@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-import { api } from "../lib/api";
+import { apiPublic } from "../lib/api";
 import { useAdminHealth } from "../lib/queries";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -21,7 +21,7 @@ export default function ServerHealthPage() {
   const adminHealth = useAdminHealth();
   const liveness = useQuery({
     queryKey: ["public", "health"],
-    queryFn: () => api("/health", livenessSchema),
+    queryFn: () => apiPublic("/health", livenessSchema),
     refetchInterval: 15000,
   });
 

@@ -12,6 +12,10 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://securetalk:${POSTGRES_PASSWORD}@postgres:5432/securetalk
       REDIS_URL: redis://redis:6379/0
+      # Production defaults are strict; .env can override explicitly.
+      ENVIRONMENT: ${ENVIRONMENT:-prod}
+      AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-false}
+      BOOTSTRAP_ADMIN_ENABLED: ${BOOTSTRAP_ADMIN_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,6 +71,17 @@ services:
       timeout: 5s
       retries: 5
 
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    image: securetalk/web:latest
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - internal
+
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
@@ -80,6 +95,7 @@ services:
       - ./certbot/www:/var/www/certbot:ro
     depends_on:
       - api
+      - web
     networks:
       - internal
 

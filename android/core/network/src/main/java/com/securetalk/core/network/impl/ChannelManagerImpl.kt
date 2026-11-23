@@ -37,6 +37,7 @@ class ChannelManagerImpl(
     private val memberDao: MemberDao,
     private val ownUserId: () -> String,
     private val isLocalMode: () -> Boolean = { false },
+    private val auth: AuthRepository? = null,
 ) : ChannelManager {
 
     override val channels: Flow<List<ChannelInfo>> = channelDao.observeAll().map { list ->
@@ -154,12 +155,15 @@ class ChannelManagerImpl(
             },
         )
         membersCache.value = membersCache.value + (id.value to remote)
+        // Map device ids to owners so /users/{id}/keys can be queried later.
+        auth?.rememberMembers(remote)
         Result.success(remote)
     } catch (e: Exception) {
         // offline: fall back to cache
         val cached = memberDao.getForChannel(id.value).map {
             Member(UserId(it.userId), DeviceId(it.deviceId), it.displayName, parseRole(it.role))
         }
+        auth?.rememberMembers(cached)
         Result.success(cached)
     }
 

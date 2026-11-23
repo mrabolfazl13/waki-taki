@@ -21,6 +21,11 @@ export default defineConfig({
         target: "http://localhost:8000",
         changeOrigin: true,
       },
+      // Public liveness probe is mounted at the root, not under /api/v1.
+      "/health": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
     },
   },
 });

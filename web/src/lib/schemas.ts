@@ -20,7 +20,7 @@ export const userSchema = z.object({
   display_name: z.string(),
   role: z.string(),
   disabled: z.boolean().optional(),
-  created_at: z.string().optional(),
+  created_at: z.string().nullable().optional(),
 });
 export type User = z.infer<typeof userSchema>;
 
@@ -29,7 +29,7 @@ export const channelSchema = z.object({
   name: z.string(),
   // /admin/channels includes owner_id + created_at; /channels (per-user) does not.
   owner_id: z.string().optional(),
-  created_at: z.string().optional(),
+  created_at: z.string().nullable().optional(),
   epoch: z.number().int().positive().optional(),
   member_count: z.number().int().nonnegative().optional(),
   is_owner: z.boolean().optional(),
@@ -40,7 +40,7 @@ export const deviceSchema = z.object({
   id: z.string(),
   user_id: z.string().optional(),
   name: z.string().optional(),
-  registered_at: z.string().optional(),
+  registered_at: z.string().nullable().optional(),
   revoked_at: z.string().nullable().optional(),
 });
 export type Device = z.infer<typeof deviceSchema>;
@@ -51,7 +51,7 @@ export const membershipSchema = z.object({
   user_id: z.string(),
   user_display_name: z.string().optional(),
   role: z.string().optional(),
-  joined_at: z.string().optional(),
+  joined_at: z.string().nullable().optional(),
 });
 export type Membership = z.infer<typeof membershipSchema>;
 
@@ -66,24 +66,27 @@ export const adminRoleInputSchema = z.object({
 export type AdminRoleInput = z.infer<typeof adminRoleInputSchema>;
 export const adminRoleSchema = userSchema;
 
+// Backend uses autoincrement INTEGER ids for security events / audit logs.
+const numericId = z.union([z.string(), z.number()]).transform((v): string => String(v));
+
 export const securityEventSchema = z.object({
-  id: z.string(),
+  id: numericId,
   type: z.string(),
   severity: z.string(),
   channel_id: z.string().nullable().optional(),
   user_id: z.string().nullable().optional(),
   detail: z.unknown().optional(),
-  created_at: z.string().optional(),
+  created_at: z.string().nullable().optional(),
 });
 export type SecurityEvent = z.infer<typeof securityEventSchema>;
 
 export const auditLogSchema = z.object({
-  id: z.string(),
+  id: numericId,
   actor_admin_id: z.string().nullable().optional(),
   action: z.string(),
   target: z.string().nullable().optional(),
   detail: z.unknown().optional(),
-  created_at: z.string().optional(),
+  created_at: z.string().nullable().optional(),
 });
 export type AuditLog = z.infer<typeof auditLogSchema>;
 
@@ -116,7 +119,7 @@ export const adminSettingsInputSchema = adminSettingsSchema.partial();
 export type AdminSettingsInput = z.infer<typeof adminSettingsInputSchema>;
 
 /** Accept either a bare array or an {items: [...]} envelope. */
-export function listSchema<T>(item: z.ZodType<T>): z.ZodType<T[]> {
+export function listSchema<T>(item: z.ZodType<T, z.ZodTypeDef, unknown>): z.ZodType<T[]> {
   return z.preprocess(
     (v) => {
       if (Array.isArray(v)) return v;

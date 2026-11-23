@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 abstract class BaseWsTransport(
     protected val client: OkHttpClient,
     protected val scope: CoroutineScope,
+    protected val deviceId: String = "",
 ) : CommunicationTransport {
 
     private val _events = MutableSharedFlow<WsEvent>(replay = 0, extraBufferCapacity = 256)
@@ -50,7 +51,7 @@ abstract class BaseWsTransport(
     protected var webSocket: WebSocket? = null
     private val userInitiatedClose = AtomicBoolean(false)
     private var reconnectAttempt = 0
-    @Volatile private var activeChannel: ChannelId? = null
+    @Volatile protected var activeChannel: ChannelId? = null
 
     /** URL and per-mode auth for the WS endpoint. */
     protected abstract fun buildRequest(): Request
@@ -105,6 +106,15 @@ abstract class BaseWsTransport(
 
     override suspend fun setActiveChannel(channelId: ChannelId?) {
         activeChannel = channelId
+        sendJoinIfPossible()
+    }
+
+    /** Backend/local host require an explicit join before floor or media (§6). */
+    protected fun sendJoinIfPossible() {
+        val channel = activeChannel ?: return
+        val id = deviceId
+        if (id.isBlank() || webSocket == null) return
+        scope.launch { send(WsCommand.Join(channel, DeviceId(id))) }
     }
 
     protected fun emit(event: WsEvent) {
@@ -116,11 +126,8 @@ abstract class BaseWsTransport(
             reconnectAttempt = 0
             _state.value = TransportState.CONNECTED
             onOpenHook()
-            activeChannel?.let {
-                // presence / channel re-join hooks belong to the transport impls;
-                // base just reports the channel context is live again.
-                emit(WsEvent.ChannelEvent(it, WsEvent.ChannelEventKind.MEMBER_JOINED, "self-reconnected"))
-            }
+            // Re-join after reconnect: the server drops all state for the old socket.
+            sendJoinIfPossible()
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
