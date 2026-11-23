@@ -109,32 +109,37 @@ class AuthRepository(
         return response.device_id
     }
 
-    override suspend fun bundleFor(deviceId: DeviceId): Result<PreKeyBundleData?> = try {
-        // Peer bundles live at GET /users/{user_id}/keys (ARCHITECTURE §5).
-        // The device -> user mapping comes from the channel roster.
-        val userId = deviceUsers[deviceId.value]
-        if (userId != null) {
-            val remote = api.userKeys(userId).firstOrNull { it.device_id == deviceId.value }
-            if (remote != null) {
-                return Result.success(
+    override suspend fun bundleFor(deviceId: DeviceId): Result<PreKeyBundleData?> {
+        return try {
+            // Peer bundles live at GET /users/{user_id}/keys (ARCHITECTURE §5).
+            // The device -> user mapping comes from the channel roster.
+            val userId = deviceUsers[deviceId.value]
+            val peer = if (userId != null) {
+                api.userKeys(userId).firstOrNull { it.device_id == deviceId.value }
+            } else {
+                null
+            }
+            if (peer != null) {
+                Result.success(
                     PreKeyBundleData(
-                        deviceId = DeviceId(remote.device_id),
-                        identitySigningPub = unhex(remote.identity_pubkey), // X25519 identity point
-                        identityEd25519Pub = unhex(remote.signing_pubkey),  // Ed25519 verify key
-                        signedPrekeyPub = unhex(remote.signed_prekey),
-                        prekeySignature = unhex(remote.prekey_signature),
-                        oneTimePrekeyPub = remote.one_time_prekey?.let { unhex(it.pubkey) },
-                        oneTimePrekeyId = remote.one_time_prekey?.key_id,
+                        deviceId = DeviceId(peer.device_id),
+                        identitySigningPub = unhex(peer.identity_pubkey), // X25519 identity point
+                        identityEd25519Pub = unhex(peer.signing_pubkey),  // Ed25519 verify key
+                        signedPrekeyPub = unhex(peer.signed_prekey),
+                        prekeySignature = unhex(peer.prekey_signature),
+                        oneTimePrekeyPub = peer.one_time_prekey?.let { unhex(it.pubkey) },
+                        oneTimePrekeyId = peer.one_time_prekey?.key_id,
                     ),
                 )
+            } else {
+                // Fallback for our own devices: GET /devices (public metadata
+                // only; one-time prekeys are not returned there).
+                val local = api.myDevices().firstOrNull { it.device_id == deviceId.value }
+                Result.success(local?.let(::toBundle))
             }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
-        // Fallback for our own devices: GET /devices (public metadata only;
-        // one-time prekeys are not returned there).
-        val local = api.myDevices().firstOrNull { it.device_id == deviceId.value }
-        Result.success(local?.let(::toBundle))
-    } catch (e: Exception) {
-        Result.failure(e)
     }
 
     private fun toBundle(local: com.securetalk.core.network.api.DeviceResponse): PreKeyBundleData =

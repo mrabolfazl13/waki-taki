@@ -55,10 +55,12 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
+        working-directory: backend
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
+          # requirements-dev.txt includes requirements.txt plus pytest,
+          # pytest-asyncio, httpx and fakeredis needed by tests/conftest.py.
+          pip install -r requirements-dev.txt pytest-cov
       - name: Run migrations
         run: alembic upgrade head
       # Fail if zero tests were collected: pytest exits 5 on "no tests ran",
