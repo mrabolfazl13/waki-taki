@@ -7,7 +7,10 @@ FROM node:20-alpine AS build
 WORKDIR /build
 
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# npm ci occasionally hangs on GH runners ("Exit handler never called!");
+# npm install honours the lockfile but tolerates registry hiccups better.
+ENV npm_config_fetch_retries=5 npm_config_fetch_timeout=60000
+RUN npm install --no-audit --no-fund
 
 COPY . .
 RUN npm run build

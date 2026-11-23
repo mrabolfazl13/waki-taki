@@ -21,6 +21,8 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # Fail fast instead of occupying a runner for hours if a test wedges.
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -33,7 +35,7 @@ jobs:
           POSTGRES_PASSWORD: testpassword
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U securetalk"
+          --health-cmd "pg_isready -U securetalk -d securetalk_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -68,7 +70,7 @@ jobs:
       - name: Run tests (fail if none collected)
         run: |
           set +e
-          python -m pytest tests -v --tb=short --strict-markers
+          python -u -m pytest tests -v -x --tb=short --strict-markers
           code=$?
           set -e
           if [ "$code" -eq 5 ]; then

@@ -13,6 +13,7 @@ env:
 jobs:
   backend-image:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
@@ -31,6 +32,7 @@ jobs:
 
   web-image:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
