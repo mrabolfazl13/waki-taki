@@ -70,7 +70,7 @@ jobs:
       - name: Run tests (fail if none collected)
         run: |
           set +e
-          python -u -m pytest tests -v -x --tb=short --strict-markers
+          python -u -m pytest tests -v -x --tb=short --strict-markers --timeout=30 --timeout-method=thread
           code=$?
           set -e
           if [ "$code" -eq 5 ]; then
