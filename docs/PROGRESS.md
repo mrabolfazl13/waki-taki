@@ -210,3 +210,14 @@
   `sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab`
 - DNS at time of incident: `wakitaki.sadsirco.ir` → 2.189.255.225 (added by owner); `wakitaki.absadeghi.ir` still NXDOMAIN.
 - Acceptance: n/a | Remaining: host recovery + swap, then re-run the start and public checks.
+
+### T-11.A4 — Host recovered: swap added, app publicly verified
+- Agent: A | Status: VERIFIED (one DNS record still missing)
+- Details: After the owner rebooted the VM, 2 GB swap was added (`/swapfile`, fstab entry, `vm.swappiness=20`) and the two app containers were restarted. Memory is now stable (≈1.5 GB used, ≈440 MB available, ~300 MB swap in use; api 105 MB / web 9 MB). Origin responds; the earlier Cloudflare 504 was the hung origin, not DNS/nginx.
+- Tests (public internet, through the existing proxy/edge):
+  - `https://wakitaki.sadsirco.ir/health` → `200 {"status":"ok"}` (public DNS: 77.90.59.77 proxy)
+  - SPA `/` → 200, `index.html` (610 bytes)
+  - admin login → 200; `GET /admin/users` → 200 (1 user); `GET /admin/health` → `200 {"status":"ok","redis":true}`
+  - device 201, channel 201, **WSS** `wss://…/ws` join + ping/pong ✔
+    (origin direct with `Host: wakitaki.absadeghi.ir` also returns `200 {"status":"ok"}`)
+- Remaining: `wakitaki.absadeghi.ir` is still **NXDOMAIN** on 1.1.1.1/8.8.8.8 — the Cloudflare zone needs that record pointing to the origin/proxy. Once present it will serve the same verified app.

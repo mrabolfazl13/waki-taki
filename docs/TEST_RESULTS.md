@@ -337,3 +337,18 @@ enum names while migration 0001 defines lowercase enum values. Fixed in
 Public reachability is blocked on DNS only:
 `wakitaki.absadeghi.ir` → NXDOMAIN; `wakitaki.sadsirco.ir` → 77.90.59.77 /
 5.231.23.233 (do not serve this app). Both need to resolve to 2.189.255.225.
+
+## Post-incident recovery + public verification (2026-11-24 ~00:40 UTC)
+
+Host rebooted by the owner; 2 GB swap added permanently; containers restarted.
+
+| Check | Result |
+|---|---|
+| `free -m` / `swapon --show` | 1967 MB RAM, ≈440 MB available, **2 GB swap active** |
+| `wakitaki_api` / `wakitaki_web` | healthy (105 MB / 9 MB) |
+| Public `https://wakitaki.sadsirco.ir/health` | `200 {"status":"ok"}` |
+| Public SPA `/` | `200`, `index.html` |
+| Public admin API | login 200, `/admin/users` 200, `/admin/health` → `{"status":"ok","redis":true}` |
+| Public WSS `wss://…/ws` | join ✔, ping → pong ✔ |
+| Origin with `Host: wakitaki.absadeghi.ir` | `200 {"status":"ok"}` |
+| `wakitaki.absadeghi.ir` DNS (1.1.1.1 / 8.8.8.8) | **NXDOMAIN** — record still missing |

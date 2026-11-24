@@ -44,6 +44,7 @@
 15. **Production host ran out of memory on first WakiTaki start (2026-11-24).** The VM has
     1.9 GB RAM, no swap, ~130 MB available and ~18 existing containers. Adding the API
     container caused reclaim thrash: TCP connects succeed but sshd/nginx cannot respond.
-    Do not deploy this stack on that host without swap (≥2 GB) or more RAM. The app
-    containers themselves are capped at 256 MB (api) / 32 MB (web); the problem is the
-    host's total headroom, not a single container limit.
+    **Mitigated 2026-11-24:** a 2 GB `/swapfile` (fstab-persistent, `vm.swappiness=20`) was
+    added and the stack runs healthy with ≈440 MB RAM available. Do not remove the swap
+    file on this host. The app containers are capped at 256 MB (api) / 32 MB (web); the
+    problem was host total headroom, not a single container limit.
