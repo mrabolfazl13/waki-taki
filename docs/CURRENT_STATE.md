@@ -28,6 +28,7 @@
 - New regression tests: cross-instance realtime fan-out, transport size bounds, envelope validation, revoked-device disconnect.
 - Capacity/latency measured locally (20 members): floor grant p95 **4.97 ms**, media relay p95 **6.07 ms**, 21st member → 409.
 - Android CI now runs `./gradlew test` across all modules (unit tests live in core modules, not `:app`).
+- **Android now builds locally**: `gradle test` → 38 tests pass, `:app:assembleDebug` → 25.9 MB APK, `:app:bundleRelease` → 10.0 MB AAB (R8 clean). On-device audio/PTT interop still pending.
 
 ## Next
 - CI: confirm backend/android/web/docker workflows green on GitHub.

@@ -66,9 +66,11 @@ in this environment · ❌ open gap.
 
 ## 6. Open gaps (honest list)
 
-1. **Android not compiled/tested here** — all Kotlin security code (X3DH, ratchet,
-   sender keys, Keystore sealing) must be proven by CI `./gradlew test` + on-device
-   interop. Until then phase 5 remains "implemented", not "verified".
+1. **Android on-device interop not verified** — the project now compiles and its unit
+   tests pass locally (38 executions, 0 failures: X3DH/Ed25519/sender keys, replay
+   window, jitter buffer, media framing, local floor control), plus debug APK and
+   release AAB build. Keystore sealing and PTT/crypto interop between two devices
+   still need a real-device test.
 2. **No external penetration test / third-party audit.**
 3. **Multi-instance deployment untested** — cross-instance fan-out is covered only
    with two Hub objects on one fake Redis.

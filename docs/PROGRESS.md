@@ -165,3 +165,11 @@
 - Details: Wrote a control-by-control audit (auth/session, key material, realtime/media, dashboard/edge, deployment) with explicit ✅/🟡/❌ status and an honest open-gap list (Android unverified, no external pentest, multi-instance untested, dashboard tokens in localStorage, no key-transparency UX). Hardening: uvicorn `--ws-max-size 262144` + WS ping interval/timeout in the API image; CSP + Permissions-Policy added to the edge nginx and the web image's nginx; removed the nonexistent `ADMIN_TOKEN` from `.env.example`/deploy README (admin endpoints authenticate with a JWT that has role=admin).
 - Tests: n/a for config; backend/web suites re-run green after the CMD/config edits (44→45 passed, 1 skipped).
 - Acceptance: audit documented with release gate | Remaining: every 🟡 item requires a Docker/TLS/Android/CI environment.
+
+### T-V.A1 — Android first real build + unit tests (local, phase 2/5/7/9 verification)
+- Agent: A | Status: TESTED
+- Files: android/** (no source changes needed), android/local.properties (local, git-ignored)
+- Environment: Temurin JDK 17, Gradle 8.7, Android SDK platform-34 + build-tools 34.0.0 installed locally (dl.google.com is blocked from this network; artifacts were fetched via mirrors with a local-only Gradle init script — no repo build files changed).
+- Details: First time the Kotlin project was compiled outside CI. `gradle test` → all modules compile; unit tests in `core/common` (media framing), `core/security` (crypto round-trips, replay window), `core/audio` (jitter buffer) and `core/network` (local floor controller) execute.
+- Tests: `gradle test` → **BUILD SUCCESSFUL**, **38 test executions (debug+release), 0 failures/errors**. `:app:assembleDebug` → **BUILD SUCCESSFUL**, `app-debug.apk` 25.9 MB. `:app:bundleRelease` → **BUILD SUCCESSFUL**, `app-release.aab` 10.0 MB (R8/minify passes).
+- Acceptance: Android compiles, unit tests pass, debug APK + release AAB build | Remaining: on-device PTT/audio/crypto interop (§9 performance), and the same run in GitHub Actions.

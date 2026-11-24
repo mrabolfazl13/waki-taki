@@ -191,3 +191,27 @@ runs can no longer wedge the next one on a stale journal.
 Android compile/unit tests (no SDK at `ANDROID_HOME=G:\SDK`), Docker image builds,
 TLS/WSS through nginx, real Redis pub/sub across processes, WebRTC SDP/ICE with a
 real browser/device client.
+
+---
+
+# Test Results — Android first real build (Agent A, 2026-11-24)
+
+Environment: Windows, Temurin JDK 17.0.19, Gradle 8.7, Android SDK platform-34 /
+build-tools 34.0.0 (installed locally; dl.google.com is unreachable from this
+network so a local-only Gradle mirror init script was used — repository build
+files were not modified).
+
+| Command | Result |
+|---|---|
+| `gradle :core:common:testDebugUnitTest` | BUILD SUCCESSFUL (3m25s) |
+| `gradle test` (all modules) | **BUILD SUCCESSFUL** in 30m; **38 test executions (debug+release), 0 failures, 0 errors** |
+| `gradle :app:assembleDebug` | **BUILD SUCCESSFUL**; `app-debug.apk` = 25,859,816 bytes |
+| `gradle :app:bundleRelease` | **BUILD SUCCESSFUL**; `app-release.aab` = 9,994,881 bytes (R8/minify clean) |
+
+Tests executed: `MediaPacketCodecTest` (3), `CryptoEngineTest` (5), `ReplayWindowTest` (2),
+`JitterBufferTest` (3), `LocalFloorControllerTest` (6) — each in debug and release.
+
+This resolves the long-standing "Android not compiled locally" blocker for phases
+2/5/7/9 at the build level. Still NOT verified: on-device audio path, Bluetooth
+routing, PTT round trip against a live server, crypto interop with a second device,
+and the §9 performance targets.
