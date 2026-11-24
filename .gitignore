@@ -34,3 +34,7 @@ android/local.properties
 .vscode/
 Thumbs.db
 .DS_Store
+# Local tool state / CI scratch
+.workbuddy-ai/
+.zcode/
+ci-artifacts/
