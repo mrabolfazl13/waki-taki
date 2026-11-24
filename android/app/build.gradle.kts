@@ -19,10 +19,27 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        create("release") {
+            // Signing material comes from the environment so no key is committed.
+            // ANDROID_KEYSTORE_FILE may be absolute or relative to the repo root.
+            val ksPath = System.getenv("ANDROID_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
+            val ksFile = ksPath?.let { rootProject.file(it) }
+            if (ksFile != null && ksFile.exists()) {
+                storeFile = ksFile
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: "wakitaki"
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+                    ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Unsigned release builds stay valid (AAB for CI); APK needs a key to install.
+            signingConfig = signingConfigs.getByName("release").takeIf { it.storeFile != null }
         }
     }
     buildFeatures {
