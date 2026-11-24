@@ -61,7 +61,7 @@ in this environment · ❌ open gap.
 | Only 80/443 exposed; postgres/redis/api/web on the internal network | 🟡 `deploy/docker-compose.yml` (not run here — no Docker daemon) |
 | Redis persistence disabled (ephemeral presence/floor only) | 🟡 compose command; not smoke-tested |
 | `uvicorn --ws-max-size 262144` + `--ws-ping-interval/timeout 20` | 🟡 `backend/Dockerfile` (build unverified here) |
-| Alembic migration path + idempotency | 🟡 verified on sqlite and in CI job definition; Postgres run pending CI |
+| Alembic migration path + idempotency | ✅ verified locally on PostgreSQL 16.4 (up→up→down→up) |
 | Secrets are placeholders only in `.env.example`; no `ADMIN_TOKEN` (admin = JWT role) | ✅ (docs corrected 2026-11-24) |
 
 ## 6. Open gaps (honest list)
@@ -72,10 +72,11 @@ in this environment · ❌ open gap.
    release AAB build. Keystore sealing and PTT/crypto interop between two devices
    still need a real-device test.
 2. **No external penetration test / third-party audit.**
-3. **Multi-instance deployment untested** — cross-instance fan-out is covered only
-   with two Hub objects on one fake Redis.
-4. **No load test under real Postgres/Redis or through nginx**; local numbers are in
-   `TEST_RESULTS.md`.
+3. **Multi-instance deployment now tested at process level** — two live uvicorn replicas
+   share presence/floor and relay media through real Redis (`scripts/multiinstance_check.py`);
+   nginx/TLS in front of them is still untested.
+4. **Load tested under real Postgres/Redis locally** (p95 grant 5.95 ms, relay 8.42 ms), but
+   not through nginx and not with more than two replicas or a real Android client.
 5. **WebRTC signaling has no live SDP/ICE exchange test** (relay path is unit-tested).
 6. **Dashboard token storage** (see §4) and **no CSRF** because auth is header-based.
 7. **No key transparency / safety-number verification UX** in the Android app yet —

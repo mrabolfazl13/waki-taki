@@ -15,6 +15,18 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the system design and [docs
 - Group audio: Signal Sender-Key distribution + AES-256-GCM per packet; relay/host sees only opaque ciphertext headers.
 - PTT floor control is server-authoritative. Membership changes rotate keys and bump the epoch.
 
+## Local real-stack server (PostgreSQL + Redis)
+From `backend/`:
+
+```bash
+export DATABASE_URL=postgresql+psycopg://user:pass@127.0.0.1:5432/securetalk
+export ST_REDIS_URL=redis://127.0.0.1:6379/0
+python serve_local.py --port 8000      # Windows-safe selector loop; or `uvicorn app.main:app`
+```
+
+`python scripts/multiinstance_check.py --a http://127.0.0.1:8000 --b http://127.0.0.1:8001`
+checks that two replicas share presence, floor control and media via Redis.
+
 ## Capacity / latency smoke test
 With a live API (dev: `uvicorn run_live:app --port 8000` inside `backend/`):
 

@@ -40,4 +40,5 @@ def make_sessionmaker(engine) -> async_sessionmaker[AsyncSession]:
 def make_redis(redis_url: str):
     import redis.asyncio as aioredis
 
-    return aioredis.from_url(redis_url, decode_responses=True)
+    # RESP2 keeps compatibility with older Redis servers (5.x); Redis 7 supports it too.
+    return aioredis.from_url(redis_url, decode_responses=True, protocol=2)

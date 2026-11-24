@@ -4,7 +4,7 @@
    `media:{channel_id}` are now base64 text (`hub._on_remote_media` decodes), so a single normal
    pubsub client works with `decode_responses=True` on both real Redis and fakeredis. The brittle
    second-client fallback was removed. Covered by `tests/test_realtime_fanout.py` with two Hub
-   instances on one Redis (2026-11-24); still not exercised across two live API processes.
+   instances on one Redis and (2026-11-24) across **two live uvicorn processes** sharing real Redis + PostgreSQL (`scripts/multiinstance_check.py`).
 2. ~~**Duplicate `floor.released` frames**~~ — already fixed in `hub._floor_release` (sender
    excluded from the broadcast). Stale entry retained for history.
 
@@ -28,3 +28,9 @@
     in-memory sqlite (`StaticPool`, `journal_mode=MEMORY`, `synchronous=OFF`); CI `DATABASE_URL`
     is preserved so the Postgres path is actually used. Capacity runs need a raised
     `AUTH_RATE_LIMIT` (or the load script retries 429s).
+
+12. **Windows needs a selector event loop for psycopg async (informational).** uvicorn on
+    Windows picks Proactor and psycopg async rejects it. Use `backend/serve_local.py`
+    (selector loop) for a real-Postgres dev server; Linux/CI is unaffected.
+13. **Redis < 6 compatibility (informational).** `make_redis` pins RESP2 so Redis 5.x
+    works; Redis 7 is fine with the same setting.

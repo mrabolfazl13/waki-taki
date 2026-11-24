@@ -5,13 +5,19 @@ import asyncio
 import base64
 import os
 import struct
+import uuid
 
 import fakeredis.aioredis
 import pytest
 from starlette.testclient import TestClient
 
 
+def _suffix(tc) -> str:
+    return getattr(tc, "st_suffix", "")
+
+
 def _register(tc, name, password="password123"):
+    name = f"{name}{_suffix(tc)}"
     r = tc.post("/api/v1/auth/register", json={"display_name": name, "password": password})
     assert r.status_code == 201, r.text
     return r.json()
@@ -37,8 +43,10 @@ MEDIA_HEADER = struct.Struct(">I16sI")
 @pytest.fixture
 def ws():
     # In-memory sqlite (StaticPool) keeps this fast and avoids stale on-disk
-    # journals from an interrupted run wedging the next one.
-    os.environ["ST_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+    # journals from an interrupted run wedging the next one. When a real
+    # DATABASE_URL is provided (CI / local Postgres run), keep it.
+    if not os.environ.get("DATABASE_URL"):
+        os.environ["ST_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
     from app.core.config import get_settings
     from app.db import Base, make_engine, make_sessionmaker
@@ -48,16 +56,25 @@ def ws():
     settings = get_settings()
     engine = make_engine(settings.database_url)
     session_factory = make_sessionmaker(engine)
-    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    if os.environ.get("SECURETALK_TEST_REAL_REDIS") == "1":
+        from app.db import make_redis
+
+        redis = make_redis(os.environ.get("ST_REDIS_URL", "redis://127.0.0.1:6379/15"))
+    else:
+        redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     init_state(engine, session_factory, redis)
     app = create_app()
 
     async def _tables():
         async with engine.begin() as conn:
+            # drop first: a real Postgres run keeps rows between tests.
+            await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
 
     asyncio.run(_tables())
+    tc_suffix = uuid.uuid4().hex[:8]
     with TestClient(app) as tc:
+        tc.st_suffix = tc_suffix
         yield tc
     asyncio.run(engine.dispose())
 
@@ -115,8 +132,9 @@ def _join_two(ws_conn_owner, ws_conn_member, ctx):
     cid, odev, mdev = ctx["cid"], ctx["owner_dev"], ctx["member_dev"]
     ws_conn_owner.send_json({"type": "join", "data": {"channel_id": cid, "device_id": odev}})
     ws_conn_member.send_json({"type": "join", "data": {"channel_id": cid, "device_id": mdev}})
-    j1 = ws_conn_owner.receive_json()
-    j2 = ws_conn_member.receive_json()
+    # Presence events may be fanned out before `joined` (real Redis timing).
+    j1 = _recv_until(ws_conn_owner, {"joined"})
+    j2 = _recv_until(ws_conn_member, {"joined"})
     assert j1["type"] == "joined" and j2["type"] == "joined"
 
 
@@ -256,7 +274,7 @@ class TestTransportLimits:
         ctx = _join_channel(ws)
         with ws.websocket_connect(f"/ws?token={ctx['owner']['access_token']}") as w:
             w.send_json({"type": "join", "data": {"channel_id": ctx["cid"], "device_id": ctx["owner_dev"]}})
-            assert w.receive_json()["type"] == "joined"
+            assert _recv_until(w, {"joined"})["type"] == "joined"
             from app.core.config import get_settings
 
             s = get_settings()
@@ -275,7 +293,7 @@ class TestDeviceRevocation:
         auth = {"Authorization": f"Bearer {ctx['owner']['access_token']}"}
         with ws.websocket_connect(f"/ws?token={ctx['owner']['access_token']}") as w:
             w.send_json({"type": "join", "data": {"channel_id": ctx["cid"], "device_id": ctx["owner_dev"]}})
-            assert w.receive_json()["type"] == "joined"
+            assert _recv_until(w, {"joined"})["type"] == "joined"
             r = ws.delete(f"/api/v1/devices/{ctx['owner_dev']}", headers=auth)
             assert r.status_code == 204
             m = _recv_until(w, {"error"})

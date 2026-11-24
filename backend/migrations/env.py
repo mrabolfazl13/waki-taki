@@ -46,6 +46,12 @@ async def run_async_migrations() -> None:
 
 def run_migrations_online() -> None:
     import asyncio
+    import sys
+
+    # psycopg async cannot use the Windows Proactor loop (needed for a local
+    # PostgreSQL run on a dev machine; CI/Linux is unaffected).
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(run_async_migrations())
 
 

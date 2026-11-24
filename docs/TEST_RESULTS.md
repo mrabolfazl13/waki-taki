@@ -215,3 +215,57 @@ This resolves the long-standing "Android not compiled locally" blocker for phase
 2/5/7/9 at the build level. Still NOT verified: on-device audio path, Bluetooth
 routing, PTT round trip against a live server, crypto interop with a second device,
 and the §9 performance targets.
+
+---
+
+# Test Results — real PostgreSQL/Redis and multi-replica (Agent A, 2026-11-24)
+
+PostgreSQL 16.4 (portable binaries, port 5433) and Redis 5.0.14 (port 6380) were
+installed locally to exercise the production datastore path instead of
+sqlite+fakeredis.
+
+## Migrations on real PostgreSQL — PASS
+
+`alembic upgrade head` → `upgrade head` (idempotent) → `downgrade -1` → `upgrade head`;
+`alembic current` = `0002_admin_settings (head)`.
+
+## Full backend suite on real PG + real Redis — PASS
+
+```
+DATABASE_URL=postgresql+psycopg://securetalk@127.0.0.1:5433/securetalk_test SECURETALK_TEST_REAL_REDIS=1 ST_REDIS_URL=redis://127.0.0.1:6380/15 pytest -q
+→ 46 passed, 1 skipped in 614.98s
+```
+
+Fixes required to make the real path work (all landed):
+
+| Issue | Fix |
+|---|---|
+| psycopg async refuses Windows Proactor loop | Alembic env sets SelectorEventLoop on win32; `backend/serve_local.py` runs uvicorn on a selector loop |
+| redis-py 8 sends `HELLO 3`, Redis 5 rejects it | `make_redis` pins `protocol=2` |
+| Persistent Postgres keeps rows between tests | WS fixture drops/recreates schema; unique display-name suffix per run |
+| Real Redis can deliver presence before `joined` | WS test helpers receive until the expected type |
+
+## Live capacity on the real stack — PASS
+
+`scripts/loadtest_ws.py --members 20 --rounds 30` against uvicorn + PG + Redis:
+
+| Metric | p50 | p95 | max |
+|---|---|---|---|
+| Floor grant | 2.38 ms | **5.95 ms** | 6.32 ms |
+| Media relay | 3.97 ms | **8.42 ms** | 10.88 ms |
+
+30/30 frames delivered, 21st member → 409, `ok: true`.
+
+## Two API replicas — PASS
+
+Two uvicorn processes (ports 8011/8012) sharing one PostgreSQL + one Redis;
+`scripts/multiinstance_check.py`:
+
+```json
+{"ok": true, "token_accepted_on_other_instance": true, "presence_shared": true,
+ "floor_shared": true, "media_crossed_instances": true}
+```
+
+So a client on replica A and a subscriber on replica B share presence, compete for
+one floor, and media published on A arrives on B. Not covered: nginx/TLS, Docker
+images, and more than two replicas.

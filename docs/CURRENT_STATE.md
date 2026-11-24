@@ -15,8 +15,9 @@
 |---|---|
 | Backend tests | ✅ 30 passed (aiosqlite + fakeredis; real PG/Redis path only in CI) |
 | Web build | ✅ tsc 0 errors, vite build clean |
-| Android build/tests | ❌ CI-only (no SDK here) |
-| Docker/CI | ❌ CI-only (no daemon here) |
+| Android build/tests | ✅ 38 unit tests pass, debug APK + release AAB built locally |
+| Docker/CI | ❌ CI-only (no Docker daemon here) |
+| Real PG/Redis + 2 replicas | ✅ verified locally (2026-11-24) |
 | End-to-end media path, live backend↔dashboard↔app integration | ❌ next phase |
 
 ## Blockers
@@ -27,6 +28,7 @@
 - Live backend ↔ dashboard integration remains green (TEST_RESULTS 2026-11-14 section).
 - New regression tests: cross-instance realtime fan-out, transport size bounds, envelope validation, revoked-device disconnect.
 - Capacity/latency measured locally (20 members): floor grant p95 **4.97 ms**, media relay p95 **6.07 ms**, 21st member → 409.
+- **Real PostgreSQL 16.4 + Redis 5.0.14 verified locally**: full suite 46 passed / 1 skipped; migrations upgrade→downgrade→upgrade clean; capacity on the real stack p95 grant 5.95 ms / relay 8.42 ms; **two API replicas** share presence/floor and relay media across instances (`scripts/multiinstance_check.py`).
 - Android CI now runs `./gradlew test` across all modules (unit tests live in core modules, not `:app`).
 - **Android now builds locally**: `gradle test` → 38 tests pass, `:app:assembleDebug` → 25.9 MB APK, `:app:bundleRelease` → 10.0 MB AAB (R8 clean). On-device audio/PTT interop still pending.
 

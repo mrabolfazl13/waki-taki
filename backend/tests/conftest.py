@@ -32,9 +32,24 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-from app.db import Base, make_engine, make_sessionmaker
+from app.db import Base, make_engine, make_redis, make_sessionmaker
 from app.deps import init_state
 from app.main import create_app
+
+# Opt-in real Redis run (e.g. CI or a local redis-server):
+#   SECURETALK_TEST_REAL_REDIS=1 ST_REDIS_URL=redis://127.0.0.1:6379/15 pytest
+USE_REAL_REDIS = os.environ.get("SECURETALK_TEST_REAL_REDIS") == "1"
+
+
+def _test_redis():
+    if USE_REAL_REDIS:
+        return make_redis(os.environ.get("ST_REDIS_URL", "redis://127.0.0.1:6379/15"))
+    return fakeredis.aioredis.FakeRedis(decode_responses=True)
+
+
+async def _close_redis(redis) -> None:
+    closer = getattr(redis, "aclose", None) or redis.close
+    await closer()
 
 
 @pytest_asyncio.fixture
@@ -48,7 +63,7 @@ async def app_env():
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     session_factory = make_sessionmaker(engine)
-    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    redis = _test_redis()
     # Init state BEFORE create_app so it reuses these instances.
     init_state(engine, session_factory, redis)
     app = create_app()
@@ -61,7 +76,7 @@ async def app_env():
     yield {"app": app, "redis": redis, "session_factory": session_factory}
     await hub.stop()
     await redis.flushall()
-    await redis.close()
+    await _close_redis(redis)
     await engine.dispose()
     if os.path.exists("./test.db"):
         os.remove("./test.db")

@@ -10,9 +10,9 @@ Statuses: NOT_STARTED / IN_PROGRESS / BLOCKED / IMPLEMENTED / TESTED / VERIFIED
 | 3 | Authentication & device identity | TESTED (backend: rotation/reuse/logout/device revoke; Android X3DH awaits CI) |
 | 4 | Audio & PTT (Opus, floor control) | TESTED (backend floor + relay latency; Android audio path on-device pending) |
 | 5 | Security (Signal-compatible sessions, sender-key group media) | TESTED (backend + Android crypto/replay unit tests pass locally; on-device interop pending) |
-| 6 | Internet communication (signaling, relay) | TESTED (signaling relay + media fan-out incl. cross-instance on one Redis) |
+| 6 | Internet communication (signaling, relay) | VERIFIED (signaling relay + media fan-out across two live API replicas on real Redis/PostgreSQL) |
 | 7 | Offline local communication (Android host, NSD, QR) | TESTED at unit level (local floor controller + media framing tests pass; on-device NSD/QR pending) |
-| 8 | 20-member capacity validation | TESTED locally (20 members: grant p95 4.97 ms, relay p95 6.07 ms, 21st → 409); real deployment pending |
+| 8 | 20-member capacity validation | VERIFIED locally (real PG/Redis: grant p95 5.95 ms, relay p95 8.42 ms, 21st → 409); Docker/nginx deployment pending |
 | 9 | Advanced UX (Bluetooth, background, diagnostics, a11y) | IMPLEMENTED + compiles into APK/AAB; on-device verification pending |
 | 10 | Security & performance audit | IN_PROGRESS (transport bounds, envelope caps, device revoke hardening landed; external audit pending) |
 | 11 | Production release (Docker, CI/CD, docs, artifacts) | IN_PROGRESS (compose/nginx/scripts/workflows authored; first real Docker build + CI green pending) |
