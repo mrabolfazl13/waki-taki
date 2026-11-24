@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     envelope_ttl_hours: int = 24
     media_replay_window: int = 128
 
+    # Transport hardening: bound the work a single client can make us do.
+    max_media_frame_bytes: int = 65536
+    max_ws_text_bytes: int = 16384
+    max_envelope_bytes: int = 8192
+
     # Bootstrap: the first account created on an empty system becomes admin.
     bootstrap_admin_enabled: bool = True
 

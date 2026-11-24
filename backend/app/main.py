@@ -1,6 +1,7 @@
 """FastAPI application entrypoint."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -63,7 +64,6 @@ def create_app() -> FastAPI:
         app.state.hub = hub
         # Envelope retention: key envelopes are ephemeral (ARCHITECTURE §7, 24 h).
         async def _envelope_sweeper() -> None:
-            import asyncio
             from datetime import timedelta
 
             from sqlalchemy import delete
@@ -84,11 +84,13 @@ def create_app() -> FastAPI:
                 except Exception:
                     log.exception("envelope sweep failed")
 
-        import asyncio as _asyncio
-
-        sweeper = _asyncio.create_task(_envelope_sweeper())
+        sweeper = asyncio.create_task(_envelope_sweeper())
         yield
         sweeper.cancel()
+        try:
+            await sweeper
+        except asyncio.CancelledError:
+            pass
         await hub.stop()
         await redis.close()
         await engine.dispose()

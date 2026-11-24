@@ -1,6 +1,6 @@
 # Current State
 
-**Updated:** 2026-11-14 · **Phase:** 1 complete → next: 2/3
+**Updated:** 2026-11-24 · **Phase:** 1 verified; 2–9 implemented, 8 tested locally; 10–11 in progress
 
 ## Done
 - Phase 0: audit, architecture contracts, decisions (greenfield).
@@ -22,5 +22,15 @@
 ## Blockers
 - Default pip index (pypi.devneeds.ir) broken — all installs must use `-i https://pypi.org/simple`. Documented for all agents.
 
+## 2026-11-24 update
+- Backend suite is deterministic again: **44 passed, 1 skipped in ~23 s** (was hanging; see PROGRESS T-6.T1).
+- Live backend ↔ dashboard integration remains green (TEST_RESULTS 2026-11-14 section).
+- New regression tests: cross-instance realtime fan-out, transport size bounds, envelope validation, revoked-device disconnect.
+- Capacity/latency measured locally (20 members): floor grant p95 **4.97 ms**, media relay p95 **6.07 ms**, 21st member → 409.
+- Android CI now runs `./gradlew test` across all modules (unit tests live in core modules, not `:app`).
+
 ## Next
-- Phase 2/3: run the backend live, connect dashboard to real API (fix Zod schema drift), Android first CI build + unit tests, then auth/identity hardening.
+- CI: confirm backend/android/web/docker workflows green on GitHub.
+- Android: first successful compile + unit tests in CI, then on-device PTT/crypto interop.
+- Deploy: real Docker build, TLS/WSS smoke, Postgres/Redis live run, multi-instance pub/sub.
+- Phase 10: external security review + load testing under a real deployment.

@@ -15,8 +15,12 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 # Default to a throwaway sqlite DB unless the environment already provides one
-# (e.g. CI points DATABASE_URL at postgres for real-backend runs).
-os.environ.setdefault("ST_DATABASE_URL", "sqlite+aiosqlite:///./test.db")
+# Default to a throwaway in-memory sqlite DB unless the environment already
+# provides one (e.g. CI points DATABASE_URL at postgres for real-backend runs).
+# In-memory + StaticPool keeps the suite fast (local disks can make per-test
+# DROP/CREATE of ~15 tables with indexes take tens of seconds).
+if not os.environ.get("ST_DATABASE_URL") and not os.environ.get("DATABASE_URL"):
+    os.environ["ST_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["AUTO_CREATE_TABLES"] = "true"
 os.environ["REDIS_URL"] = "redis://fakeredis"
 os.environ["JWT_SECRET"] = "test-secret-0123456789abcdef0123456789abcdef"

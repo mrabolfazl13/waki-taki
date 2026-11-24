@@ -56,8 +56,15 @@ class Hub:
             self._pubsub_task = asyncio.create_task(self._pubsub_loop())
 
     async def stop(self) -> None:
-        if self._pubsub_task is not None:
-            self._pubsub_task.cancel()
+        task = self._pubsub_task
+        if task is not None:
+            task.cancel()
+            # Await the cancellation: otherwise TestClient's blocking portal
+            # waits forever for the pubsub `listen()` task at teardown (Linux).
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
             self._pubsub_task = None
 
     async def _pubsub_loop(self) -> None:
@@ -100,9 +107,19 @@ class Hub:
         await self.redis.publish(f"events:{channel_id}", json.dumps(event))
 
     async def _on_channel_event(self, channel_id: str, payload: str) -> None:
+        event = json.loads(payload)
+        revoked_device = event.get("device_id") if event.get("event") == "device_revoked" else None
         for conn in list(self.conns.values()):
-            if conn.channel_id == channel_id:
-                await safe_send(conn.ws, {"type": "channel.event", "data": json.loads(payload)})
+            if conn.channel_id != channel_id:
+                continue
+            if revoked_device and conn.device_id == revoked_device:
+                await safe_send(conn.ws, {"type": "error", "data": {"code": "device_revoked"}})
+                try:
+                    await conn.ws.close(code=4403)
+                except Exception:
+                    pass
+                continue
+            await safe_send(conn.ws, {"type": "channel.event", "data": event})
 
     async def _on_remote_media(self, channel_id: str, payload) -> None:
         # payload: base64(instance_id + b"\x00" + frame) — text-safe on the wire.
@@ -127,6 +144,9 @@ class Hub:
                     log.exception("media fanout send failed")
 
     async def handle_media(self, conn: Conn, data: bytes) -> None:
+        if len(data) > settings.max_media_frame_bytes:
+            await safe_send(conn.ws, {"type": "error", "data": {"code": "media_frame_too_large"}})
+            return
         if len(data) < MEDIA_HEADER.size:
             await safe_send(conn.ws, {"type": "error", "data": {"code": "media_frame_too_short"}})
             return
@@ -226,6 +246,10 @@ class Hub:
                 text = raw.get("text")
                 if text is None:
                     continue
+                if len(text.encode("utf-8", errors="replace")) > settings.max_ws_text_bytes:
+                    await safe_send(ws, {"type": "error", "data": {"code": "message_too_large"}})
+                    await ws.close(code=4409)
+                    break
                 try:
                     msg = json.loads(text)
                     mtype, data = msg["type"], msg.get("data") or {}

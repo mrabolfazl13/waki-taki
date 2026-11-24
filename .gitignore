@@ -6,6 +6,11 @@ __pycache__/
 backend/test.db
 backend/test_ws.db
 backend/live.db
+backend/loadtest.db*
+backend/probe_*.db*
+backend/*.db-journal
+backend/*.db-wal
+backend/*.db-shm
 
 # Node
 web/node_modules/

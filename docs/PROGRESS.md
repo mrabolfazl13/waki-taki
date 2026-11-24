@@ -130,3 +130,31 @@
 - Details: Four role-gated endpoints the dashboard was calling blind (all 404): GET /admin/memberships (join Channel + User summaries; excludes deleted channels; limit/offset pagination), GET /admin/devices (public metadata only: id, user_id, name, registered_at, revoked_at — no pubkey/prekey fields), GET /admin/config (non-sensitive operational config from Settings: rate limits, floor params, max_channel_members, invite TTLs, envelope TTL, token TTLs; no secrets), GET/PUT /admin/settings (new `settings` table, JSONB values; allow-listed toggles registration_enabled / maintenance_mode / invite_creation_enabled; PUT restricted to admin, StrictBool validation + extra="forbid" (unknown keys 422) + at-least-one-key validator, audit_log entry `settings.update` written on change). Alembic migration 0002_admin_settings (upgrade/downgrade/upgrade verified on sqlite).
 - Tests: pytest -> 34 passed, 1 skipped (was 30 passed, 1 skipped). New backend/tests/test_admin_dashboard.py covers gating (403 non-admin GET + PUT, 401 anonymous), memberships + devices happy path incl. schema-field and no-key-material assertions, config no-secrets assertions, settings defaults/PUT/persistence/audit/422 validation. `npx tsc --noEmit` clean; `npm run build` clean.
 - Acceptance: dashboard Devices/Memberships/Configuration/SystemSettings pages wired to real endpoints | Remaining: dashboard settings toggles are persisted but not yet enforced in backend behavior (e.g. registration gate) — behavior wiring in a later phase.
+
+### T-6.T1 — Test-suite determinism + CI timeout root cause (2026-11-24)
+- Agent: A | Status: VERIFIED
+- Files: backend/app/db.py, backend/tests/conftest.py, backend/tests/test_ws.py, backend/app/main.py
+- Details: CI/local pytest wedged and only sometimes reported a timeout. Root cause was not the WS code: per-test `DROP/CREATE` of the full schema on a slow disk took 25–50 s per test, and interrupted runs left hot sqlite `-journal` files that made the next run block inside sqlite `execute`. Fixes: default test DB is now in-memory sqlite with `StaticPool` + `PRAGMA journal_mode=MEMORY, synchronous=OFF`; `DATABASE_URL` from CI is no longer overwritten (the Postgres path is actually exercised now); lifespan awaits the cancelled envelope sweeper; `Hub.stop()` awaits the pubsub task cancellation.
+- Tests: `pytest -q` → **44 passed, 1 skipped in ~23 s** (was: hangs / >300 s). `ruff check app tests` clean.
+- Acceptance: suite finishes deterministically on this machine | Remaining: Linux CI re-run.
+
+### T-6.T2 — Multi-instance realtime fan-out regression tests
+- Agent: A | Status: TESTED
+- Files: backend/tests/test_realtime_fanout.py
+- Details: Two `Hub` instances share one (fake) Redis: a media frame published by another instance is base64-decoded, stripped of the origin prefix and fanned out to both instances' sockets; an instance ignores its own echo; malformed payloads are dropped without killing the listener. This covers the path previously marked "CI-only" in KNOWN_ISSUES #1.
+- Tests: 4 tests pass (1.8 s).
+- Acceptance: base64 wire format + echo suppression proven | Remaining: real Redis across two uvicorn processes.
+
+### T-6.T3 — Transport hardening (frame/envelope bounds)
+- Agent: A | Status: TESTED
+- Files: backend/app/core/config.py, backend/app/realtime/hub.py, backend/app/api/keys.py, backend/tests/test_fixes.py, backend/tests/test_ws.py
+- Details: WS binary media frames > 64 KiB and text messages > 16 KiB are rejected (`media_frame_too_large`, `message_too_large` + close 4409); sender-key envelopes > 8 KiB → `413 envelope_too_large`; envelope entries with missing/mistyped fields now return `422` instead of raising `KeyError` (500). Revoking a device (`DELETE /devices/{id}`) now publishes `device_revoked` on the user's channels, and the hub sends an error + closes that device's live socket (code 4403) so a revoked device cannot keep transmitting or hold the floor.
+- Tests: pytest → 44 passed, 1 skipped (new: oversized media/text, envelope size/field validation, revoked-device disconnect).
+- Acceptance: bounds enforced and regression-tested | Remaining: reverse-proxy `client_max_body_size` / uvicorn `--ws-max-size` alignment in deploy.
+
+### T-8.C1 — 20-member capacity + latency validation (local)
+- Agent: A | Status: TESTED
+- Files: scripts/loadtest_ws.py
+- Details: New CLI creates a 20-member channel (devices + 20 WebSockets), measures floor-grant latency and binary media relay latency over 20 rounds, and asserts the 21st member is rejected with `409 channel_full`.
+- Tests: against a live uvicorn (`run_live`, sqlite + fakeredis): floor grant **p50 1.68 ms / p95 4.97 ms / max 5.23 ms**; media relay **p50 2.60 ms / p95 6.07 ms / max 10.70 ms**; 20/20 frames delivered; 21st join → **409**. `ok: true`.
+- Acceptance: §8 cap enforced and PTT latency well under the 500 ms p95 budget in this environment | Remaining: re-run against real Postgres/Redis + multi-instance deployment; Android client latency not measured (no device).

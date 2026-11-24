@@ -70,3 +70,40 @@ async def test_member_roster_and_enable_user(client):
     assert r.status_code == 200 and r.json()["disabled"] is True
     r = await client.post(f"/api/v1/admin/users/{uid}/enable", headers=h)
     assert r.status_code == 200 and r.json()["disabled"] is False
+
+
+async def test_envelope_size_and_fields_are_validated(client):
+    import base64
+
+    ch = await setup_channel(client, owner_name="envowner", member_names=("envmember",))
+    oh = auth_hdr(ch["owner"])
+    owner_dev = await make_device(client, oh, "c" * 32)
+    member_dev = await make_device(client, auth_hdr(ch["envmember"]), "d" * 32)
+    url = f"/api/v1/channels/{ch['channel_id']}/keys/distribute"
+
+    # Missing / mistyped fields -> 422 (never a 500).
+    r = await client.post(url, headers=oh, json={
+        "sender_device_id": owner_dev, "epoch": 1, "envelopes": [{"envelope_ciphertext": "AAAA"}],
+    })
+    assert r.status_code == 422
+    r = await client.post(url, headers=oh, json={
+        "sender_device_id": owner_dev, "epoch": 1,
+        "envelopes": [{"recipient_device_id": member_dev, "envelope_ciphertext": 123}],
+    })
+    assert r.status_code == 422
+
+    # Oversized ciphertext is rejected before it reaches the database.
+    big = base64.b64encode(b"x" * 9000).decode()
+    r = await client.post(url, headers=oh, json={
+        "sender_device_id": owner_dev, "epoch": 1,
+        "envelopes": [{"recipient_device_id": member_dev, "envelope_ciphertext": big}],
+    })
+    assert r.status_code == 413
+
+    # A normal envelope still works.
+    ok = base64.b64encode(b"y" * 64).decode()
+    r = await client.post(url, headers=oh, json={
+        "sender_device_id": owner_dev, "epoch": 1,
+        "envelopes": [{"recipient_device_id": member_dev, "envelope_ciphertext": ok}],
+    })
+    assert r.status_code == 201 and r.json()["stored"] == 1

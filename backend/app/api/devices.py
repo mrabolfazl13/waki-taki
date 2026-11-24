@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..deps import get_current_user, get_db, record_security_event
+from ..deps import get_current_user, get_db, get_redis, record_security_event
 from ..models import Device, OneTimePrekey, User
 from ..schemas import DeviceIn, DeviceOut
 
@@ -56,6 +56,7 @@ async def delete_device(
     device_id: str,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ) -> None:
     device = await session.get(Device, device_id)
     if device is None or device.user_id != user.id:
@@ -63,6 +64,23 @@ async def delete_device(
     await session.execute(delete(OneTimePrekey).where(OneTimePrekey.device_id == device.id))
     await session.delete(device)
     await session.commit()
+    # Kick any live WebSocket for this device: a revoked device must not keep
+    # sending media or holding the floor until it happens to reconnect.
+    import json
+
+    from ..models import Membership
+
+    channel_ids = list(
+        await session.scalars(select(Membership.channel_id).where(Membership.user_id == user.id))
+    )
+    for channel_id in channel_ids:
+        await redis.publish(
+            f"events:{channel_id}",
+            json.dumps(
+                {"channel_id": channel_id, "event": "device_revoked", "device_id": device_id,
+                 "user_id": user.id}
+            ),
+        )
     await record_security_event(
         session, "device.revoked", severity="warning", user_id=user.id, detail={"device_id": device_id}
     )

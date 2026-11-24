@@ -21,9 +21,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
       # Explicit test task: a failing unit test fails this workflow.
+      # `test` covers every module (core/common, core/security, core/audio,
+      # core/network, ...) — `:app:testDebugUnitTest` alone would skip them.
       - name: Run unit tests
         run: |
-          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-test.log
+          ./gradlew test --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-test.log
           exit ${PIPESTATUS[0]}
       - name: Publish test log to summary
         if: failure()

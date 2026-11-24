@@ -36,9 +36,9 @@ MEDIA_HEADER = struct.Struct(">I16sI")
 
 @pytest.fixture
 def ws():
-    if os.path.exists("./test_ws.db"):
-        os.remove("./test_ws.db")
-    os.environ["ST_DATABASE_URL"] = "sqlite+aiosqlite:///./test_ws.db"
+    # In-memory sqlite (StaticPool) keeps this fast and avoids stale on-disk
+    # journals from an interrupted run wedging the next one.
+    os.environ["ST_DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
     from app.core.config import get_settings
     from app.db import Base, make_engine, make_sessionmaker
@@ -60,8 +60,6 @@ def ws():
     with TestClient(app) as tc:
         yield tc
     asyncio.run(engine.dispose())
-    if os.path.exists("./test_ws.db"):
-        os.remove("./test_ws.db")
 
 
 def _join_channel_nonadmin(tc: TestClient):
@@ -251,3 +249,37 @@ class TestMediaRelay:
         with ws.websocket_connect("/ws?token=garbage") as w:
             m = w.receive_json()
             assert m["type"] == "error" and m["data"]["code"] == "invalid_token"
+
+
+class TestTransportLimits:
+    def test_oversized_media_and_text_frames_rejected(self, ws):
+        ctx = _join_channel(ws)
+        with ws.websocket_connect(f"/ws?token={ctx['owner']['access_token']}") as w:
+            w.send_json({"type": "join", "data": {"channel_id": ctx["cid"], "device_id": ctx["owner_dev"]}})
+            assert w.receive_json()["type"] == "joined"
+            from app.core.config import get_settings
+
+            s = get_settings()
+            w.send_bytes(b"z" * (s.max_media_frame_bytes + 1))
+            m = _recv_until(w, {"error"})
+            assert m["data"]["code"] == "media_frame_too_large"
+
+            w.send_text('{"type":"ping","data":{"pad":"' + "x" * (s.max_ws_text_bytes + 1) + '"}}')
+            m = _recv_until(w, {"error"})
+            assert m["data"]["code"] == "message_too_large"
+
+
+class TestDeviceRevocation:
+    def test_revoked_device_is_disconnected_and_cannot_transmit(self, ws):
+        ctx = _join_channel(ws)
+        auth = {"Authorization": f"Bearer {ctx['owner']['access_token']}"}
+        with ws.websocket_connect(f"/ws?token={ctx['owner']['access_token']}") as w:
+            w.send_json({"type": "join", "data": {"channel_id": ctx["cid"], "device_id": ctx["owner_dev"]}})
+            assert w.receive_json()["type"] == "joined"
+            r = ws.delete(f"/api/v1/devices/{ctx['owner_dev']}", headers=auth)
+            assert r.status_code == 204
+            m = _recv_until(w, {"error"})
+            assert m["data"]["code"] == "device_revoked"
+            # Device is gone from the roster as well.
+            r = ws.get("/api/v1/devices", headers=auth)
+            assert r.json() == []

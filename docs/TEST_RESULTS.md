@@ -137,3 +137,57 @@ must be owned by the authenticated user AND a channel member.
 - **Performance targets (§9)** — p95 latencies and PTT grant timing NOT VERIFIED (no load tooling run).
 - **Envelope 24 h TTL sweeper** — verified by unit test only; not waited for live.
 - **Rate limiting under load** — limits confirmed via pytest only, not hammered live.
+
+---
+
+# Test Results — suite determinism, hardening, capacity (Agent A, 2026-11-24)
+
+## Environment
+
+Windows 11, Python 3.12.10, Node 24, no Android SDK, no Docker/Postgres/Redis.
+Backend tests use in-memory sqlite + fakeredis by default; `DATABASE_URL` (CI) is
+now respected instead of being overwritten.
+
+## 1. Backend suite — PASS (was hanging)
+
+| Run | Before | After |
+|---|---|---|
+| `pytest -q` (44 tests) | hung; per-test schema DDL took 25–50 s on this disk; interrupted runs left hot sqlite journals that blocked the next run | **44 passed, 1 skipped in 23.1 s** |
+
+Root cause/fixes (see PROGRESS T-6.T1): in-memory sqlite + StaticPool with
+`journal_mode=MEMORY`, `synchronous=OFF`; CI `DATABASE_URL` preserved; lifespan
+awaits the cancelled sweeper; `Hub.stop()` awaits the pubsub task; interrupted
+runs can no longer wedge the next one on a stale journal.
+
+`ruff check app tests` → clean. Web `tsc --noEmit` + `vite build` → clean
+(built in 44.8 s; chunks: index 164.8 kB, react 163.9 kB, recharts 385.2 kB).
+
+## 2. New regression coverage — PASS
+
+| Test file | Covers |
+|---|---|
+| `tests/test_realtime_fanout.py` (4) | two Hubs on one Redis: cross-instance media fan-out, own-echo suppression, malformed payload tolerance, header round-trip (KNOWN_ISSUES #1) |
+| `tests/test_fixes.py::test_envelope_size_and_fields_are_validated` | envelope field validation (`422`), size cap (`413`), happy path (`201`) |
+| `tests/test_ws.py::TestTransportLimits` | oversized media frame → `media_frame_too_large`; oversized text → `message_too_large` + close 4409 |
+| `tests/test_ws.py::TestDeviceRevocation` | `DELETE /devices/{id}` → live socket gets `device_revoked` and closes; device leaves the roster |
+
+## 3. Phase 8 capacity/latency (local, single instance) — PASS
+
+`scripts/loadtest_ws.py --members 20 --rounds 20` against `run_live` on 127.0.0.1:8010:
+
+| Metric | p50 | p95 | max |
+|---|---|---|---|
+| Floor grant latency | 1.68 ms | **4.97 ms** | 5.23 ms |
+| Media relay latency | 2.60 ms | **6.07 ms** | 10.70 ms |
+
+- 20/20 media frames delivered; 20 members joined; 21st member join → **409 channel_full**.
+- Result JSON: `"ok": true` (budgets: p95 grant ≤ 500 ms, p95 relay ≤ 300 ms).
+- **Not covered:** real Postgres/Redis, multi-instance/edge nginx, Android
+  client-side audio latency, and long-running load. Note: capacity runs need a
+  raised `AUTH_RATE_LIMIT` (the script retries 429s otherwise).
+
+## 4. Still not verifiable in this environment
+
+Android compile/unit tests (no SDK at `ANDROID_HOME=G:\SDK`), Docker image builds,
+TLS/WSS through nginx, real Redis pub/sub across processes, WebRTC SDP/ICE with a
+real browser/device client.

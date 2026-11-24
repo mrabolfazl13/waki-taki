@@ -3,8 +3,8 @@
 1. ~~**Fakeredis + binary pub/sub crash**~~ — **FIXED (2026-11-23).** Media payloads published to
    `media:{channel_id}` are now base64 text (`hub._on_remote_media` decodes), so a single normal
    pubsub client works with `decode_responses=True` on both real Redis and fakeredis. The brittle
-   second-client fallback was removed. Not yet exercised across two live API processes; unit suite
-   no longer emits the `PubSub.__del__` warning.
+   second-client fallback was removed. Covered by `tests/test_realtime_fanout.py` with two Hub
+   instances on one Redis (2026-11-24); still not exercised across two live API processes.
 2. ~~**Duplicate `floor.released` frames**~~ — already fixed in `hub._floor_release` (sender
    excluded from the broadcast). Stale entry retained for history.
 
@@ -21,3 +21,10 @@
    `http_proxy=http://127.0.0.1:8118`; all local curl/python testing must bypass it
    (`curl --noproxy '*'`, popping proxy env vars in scripts). Vite dev server also binds
    `[::1]:5173` only, so `localhost` (not `127.0.0.1`) must be used from the same stack.
+
+11. **Slow-disk schema DDL made the test suite look wedged (fixed 2026-11-24).** Per-test
+    DROP/CREATE of the full schema could take tens of seconds here, and an interrupted run left
+    a hot sqlite `-journal` that blocked the next run inside `sqlite3.execute`. Tests now use
+    in-memory sqlite (`StaticPool`, `journal_mode=MEMORY`, `synchronous=OFF`); CI `DATABASE_URL`
+    is preserved so the Postgres path is actually used. Capacity runs need a raised
+    `AUTH_RATE_LIMIT` (or the load script retries 429s).
