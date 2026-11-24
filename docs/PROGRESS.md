@@ -202,3 +202,11 @@
 - Bug found by deploying: `Enum(Role)` stored Python enum *names* (`USER`), while migration 0001 creates the native PG enum with values (`user`); first registration on the migrated DB failed with `invalid input value for enum user_role`. Fixed with `values_callable` on both role enums + regression test asserting the ORM enum values (tests previously built the schema from models, hiding the drift).
 - Tests: internal checks via the edge nginx: 80→301, HTTPS `/health` = `{"status":"ok"}` for both hostnames with HSTS/CSP headers, SPA served, registration 201, login + `GET /admin/users` 200 after promoting the first account to admin. Local suite: 47 passed, 1 skipped. `nginx -t` OK.
 - Acceptance: stack runs on the real host using existing services | Remaining: **DNS**: `wakitaki.absadeghi.ir` has no record; `wakitaki.sadsirco.ir` currently resolves to 77.90.59.77/5.231.23.233 (does not serve the app) — both must point at 2.189.255.225 (or the proxy in front must forward by Host). Origin TLS is self-signed (fine behind Cloudflare "Full"; use a Cloudflare Origin cert for "Full (strict)").
+
+### T-11.A3 — Host memory incident during first production start (2026-11-24)
+- Agent: A | Status: BLOCKED (host console access required)
+- Details: The target host has 1.9 GB RAM, ~130 MB available, and **no swap**, while already running ~18 containers. Shortly after `wakitaki_api`/`wakitaki_web` started, the whole VM became unreachable: TCP 22/80/443 still accept SYN (50% packet loss) but `sshd` never sends its banner — classic memory thrash/reclaim stall rather than a network or nginx problem. Internal verification had already passed before this (both vhosts → `/health` 200, SPA, registration 201).
+- Recovery needed (provider console/KVM): reboot, then either `cd ~/wakitaki && docker compose down` or add swap before restarting:
+  `sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab`
+- DNS at time of incident: `wakitaki.sadsirco.ir` → 2.189.255.225 (added by owner); `wakitaki.absadeghi.ir` still NXDOMAIN.
+- Acceptance: n/a | Remaining: host recovery + swap, then re-run the start and public checks.

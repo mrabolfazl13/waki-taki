@@ -40,3 +40,10 @@
     ("user"). Tests did not catch it because they build the schema from models
     (`create_all`). Both role enums now use `values_callable`, and a regression test
     asserts the ORM enum values. Any future native enum needs the same treatment.
+
+15. **Production host ran out of memory on first WakiTaki start (2026-11-24).** The VM has
+    1.9 GB RAM, no swap, ~130 MB available and ~18 existing containers. Adding the API
+    container caused reclaim thrash: TCP connects succeed but sshd/nginx cannot respond.
+    Do not deploy this stack on that host without swap (≥2 GB) or more RAM. The app
+    containers themselves are capped at 256 MB (api) / 32 MB (web); the problem is the
+    host's total headroom, not a single container limit.
