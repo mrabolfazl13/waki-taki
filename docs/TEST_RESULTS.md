@@ -307,3 +307,33 @@ real API responses against the same Zod schemas the admin UI parses with.
 
 Wired into `.github/workflows/capacity.yml` (starts the API, then runs the
 contract check before the 20-member load test).
+
+---
+
+# Production deployment — Ubuntu host 2.189.255.225 (Agent A, 2026-11-24)
+
+Existing host services reused (no new databases/redis/nginx):
+`shared_postgres` (db `wakitaki`), `shared_redis` (db 5), edge container
+`futsal_nginx` on networks `ubuntu_futsal_network` + `shared_infra`.
+
+| Check | Result |
+|---|---|
+| `docker compose config` (2 app services only) | OK |
+| `alembic upgrade head` on shared PostgreSQL 17 | 0001 + 0002 applied |
+| `wakitaki_api` / `wakitaki_web` | healthy; API `/health` = `{"status":"ok"}` |
+| Edge nginx `nginx -t` + reload | OK; pre-existing sites unaffected |
+| `http://wakitaki.*/health` | `301` → https |
+| `https://wakitaki.absadeghi.ir/health` (via `--resolve` to the host) | `200 {"status":"ok"}` + HSTS/CSP/X-Frame/Permissions headers |
+| `https://wakitaki.sadsirco.ir/health` (via `--resolve` to the host) | `200 {"status":"ok"}` |
+| SPA at `/` | `index.html` served |
+| First registration | `201` (after the enum fix), promoted to admin; `GET /admin/users` → `200` |
+
+**Bug found only in production:** PostgreSQL rejected registrations with
+`invalid input value for enum user_role: "USER"` because `Enum(Role)` persisted
+enum names while migration 0001 defines lowercase enum values. Fixed in
+`backend/app/models.py` (`values_callable`) and guarded by
+`test_orm_enums_match_migrated_enum_values`.
+
+Public reachability is blocked on DNS only:
+`wakitaki.absadeghi.ir` → NXDOMAIN; `wakitaki.sadsirco.ir` → 77.90.59.77 /
+5.231.23.233 (do not serve this app). Both need to resolve to 2.189.255.225.

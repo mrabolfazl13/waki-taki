@@ -53,7 +53,12 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
     display_name: Mapped[str] = mapped_column(String(64))
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    role: Mapped[Role] = mapped_column(Enum(Role, name="user_role"), default=Role.USER)
+    # values_callable: store the lowercase *values* ("user"/"admin") that the
+    # Alembic migration's native PostgreSQL enum expects (not the Python names).
+    role: Mapped[Role] = mapped_column(
+        Enum(Role, name="user_role", values_callable=lambda e: [m.value for m in e]),
+        default=Role.USER,
+    )
     disabled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -103,7 +108,10 @@ class Membership(Base):
     user_id: Mapped[str] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
     )
-    role: Mapped[MemberRole] = mapped_column(Enum(MemberRole, name="member_role"), default=MemberRole.MEMBER)
+    role: Mapped[MemberRole] = mapped_column(
+        Enum(MemberRole, name="member_role", values_callable=lambda e: [m.value for m in e]),
+        default=MemberRole.MEMBER,
+    )
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

@@ -34,3 +34,9 @@
     (selector loop) for a real-Postgres dev server; Linux/CI is unaffected.
 13. **Redis < 6 compatibility (informational).** `make_redis` pins RESP2 so Redis 5.x
     works; Redis 7 is fine with the same setting.
+
+14. **ORM enum vs migrated PostgreSQL enum (fixed 2026-11-24).** `Enum(Role)`
+    persisted Python names ("USER") while Alembic created the enum with values
+    ("user"). Tests did not catch it because they build the schema from models
+    (`create_all`). Both role enums now use `values_callable`, and a regression test
+    asserts the ORM enum values. Any future native enum needs the same treatment.

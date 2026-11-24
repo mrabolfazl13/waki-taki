@@ -139,3 +139,17 @@ async def test_device_limit_and_prekey_validation(client):
     devices = (await client.get("/api/v1/devices", headers=h)).json()
     assert (await client.delete(f"/api/v1/devices/{devices[0]['id']}", headers=h)).status_code == 204
     assert (await client.post("/api/v1/devices", headers=h, json=base)).status_code == 201
+
+
+async def test_orm_enums_match_migrated_enum_values():
+    """Regression: the Alembic migration creates enums with lowercase values.
+
+    SQLAlchemy's Enum() stores Python enum *names* by default ("USER"), which a
+    migrated PostgreSQL rejects with `invalid input value for enum user_role`.
+    """
+    from app.models import MemberRole, Membership, Role, User
+
+    assert [m.value for m in Role] == ["user", "admin"]
+    assert User.__table__.c.role.type.enums == ["user", "admin"]
+    assert Membership.__table__.c.role.type.enums == ["member", "admin"]
+    assert [m.value for m in MemberRole] == ["member", "admin"]
