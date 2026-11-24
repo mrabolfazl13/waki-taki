@@ -1,0 +1,66 @@
+name: capacity
+
+# Phase 8 gate: 20-member floor control + media relay latency over a live API.
+# Runs the real ASGI app (dev launcher: sqlite + fakeredis) on the runner and
+# drives it with scripts/loadtest_ws.py. No Postgres/Redis services are needed.
+on:
+  workflow_dispatch:
+  push:
+    paths: ["backend/**", "scripts/loadtest_ws.py", ".github/workflows/capacity.yml"]
+  pull_request:
+    paths: ["backend/**", "scripts/loadtest_ws.py", ".github/workflows/capacity.yml"]
+
+jobs:
+  capacity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      ST_DATABASE_URL: sqlite+aiosqlite:///./capacity.db
+      AUTO_CREATE_TABLES: "true"
+      # A capacity run needs 22 accounts; keep the limits high for this run only.
+      AUTH_RATE_LIMIT: "500"
+      INVITE_JOIN_RATE_LIMIT: "500"
+      INVITE_CREATE_RATE_LIMIT: "500"
+      JWT_SECRET: ci-capacity-secret-0123456789abcdef0123456789abcdef
+      NO_PROXY: "127.0.0.1,localhost"
+      no_proxy: "127.0.0.1,localhost"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Start API
+        run: |
+          nohup python -u -m uvicorn run_live:app --host 127.0.0.1 --port 8000 \
+            > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1; then
+              echo "API up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to start"; tail -50 /tmp/api.log; exit 1
+      - name: Run 20-member capacity test
+        working-directory: .
+        run: |
+          python scripts/loadtest_ws.py --base http://127.0.0.1:8000 \
+            --members 20 --rounds 20 | tee /tmp/capacity.json
+      - name: Publish summary
+        if: always()
+        run: |
+          {
+            echo "### Capacity / latency"
+            echo '```json'
+            cat /tmp/capacity.json 2>/dev/null || tail -50 /tmp/api.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Stop API
+        if: always()
+        run: kill "$(cat /tmp/api.pid)" 2>/dev/null || true

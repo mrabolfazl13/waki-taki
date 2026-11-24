@@ -41,7 +41,7 @@ cmd_deploy() {
     $COMPOSE up -d postgres redis
     $COMPOSE run --rm api alembic upgrade head
     log "starting stack..."
-    $COMPOSE up -d
+    $COMPOSE up -d --remove-orphans
     if health_check; then
         log "deploy complete"
     else

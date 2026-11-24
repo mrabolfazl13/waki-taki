@@ -1,15 +1,19 @@
 """Device registration (public keys only) and key discovery."""
 from __future__ import annotations
 
+import base64
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.config import get_settings
 from ..deps import get_current_user, get_db, get_redis, record_security_event
 from ..models import Device, OneTimePrekey, User
 from ..schemas import DeviceIn, DeviceOut
 
 router = APIRouter(prefix="/devices", tags=["devices"])
+settings = get_settings()
 
 
 @router.post("", status_code=201)
@@ -18,6 +22,26 @@ async def register_device(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> dict:
+    active_devices = await session.scalar(
+        select(func.count(Device.id)).where(Device.user_id == user.id, Device.revoked_at.is_(None))
+    )
+    if (active_devices or 0) >= settings.max_devices_per_user:
+        raise HTTPException(status.HTTP_409_CONFLICT, "device_limit_reached")
+    # Prekeys are opaque public values but must be base64 and bounded, otherwise
+    # a client could store arbitrarily large blobs.
+    decoded_prekeys: list[str] = []
+    for idx, pubkey in enumerate(body.one_time_prekeys):
+        try:
+            raw = base64.b64decode(pubkey, validate=True)
+        except Exception as e:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, f"one_time_prekey_not_base64:{idx}"
+            ) from e
+        if not (16 <= len(raw) <= 512):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT, f"one_time_prekey_bad_length:{idx}"
+            )
+        decoded_prekeys.append(pubkey)
     device = Device(
         user_id=user.id,
         identity_pubkey=body.identity_pubkey,
@@ -27,7 +51,7 @@ async def register_device(
     )
     session.add(device)
     await session.flush()
-    for idx, pubkey in enumerate(body.one_time_prekeys):
+    for idx, pubkey in enumerate(decoded_prekeys):
         session.add(OneTimePrekey(device_id=device.id, key_id=idx, pubkey=pubkey))
     await session.commit()
     await record_security_event(session, "device.registered", user_id=user.id, detail={"device_id": device.id})

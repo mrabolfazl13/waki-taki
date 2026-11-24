@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     floor_queue_depth: int = 20
 
     max_channel_members: int = 20
+    max_devices_per_user: int = 10
     invite_ttl_hours: int = 72
     invite_max_uses: int = 20
     envelope_ttl_hours: int = 24

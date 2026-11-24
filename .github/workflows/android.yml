@@ -22,7 +22,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       # Explicit test task: a failing unit test fails this workflow.
       # `test` covers every module (core/common, core/security, core/audio,
-      # core/network, ...) — `:app:testDebugUnitTest` alone would skip them.
+      # core/network, ...) â€” `:app:testDebugUnitTest` alone would skip them.
       - name: Run unit tests
         run: |
           ./gradlew test --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-test.log

@@ -107,3 +107,35 @@ async def test_envelope_size_and_fields_are_validated(client):
         "envelopes": [{"recipient_device_id": member_dev, "envelope_ciphertext": ok}],
     })
     assert r.status_code == 201 and r.json()["stored"] == 1
+
+
+async def test_device_limit_and_prekey_validation(client):
+    import base64
+
+    from app.core.config import get_settings
+
+    tokens = await register(client, "devlimit")
+    h = auth_hdr(tokens)
+    base = {
+        "identity_pubkey": base64.b64encode(b"i" * 32).decode(),
+        "signing_pubkey": base64.b64encode(b"s" * 32).decode(),
+        "signed_prekey": base64.b64encode(b"p" * 32).decode(),
+        "name": "dev",
+    }
+    # Malformed / out-of-range one-time prekeys are rejected.
+    bad = dict(base, one_time_prekeys=["not base64 !!"])
+    assert (await client.post("/api/v1/devices", headers=h, json=bad)).status_code == 422
+    too_short = dict(base, one_time_prekeys=[base64.b64encode(b"x" * 4).decode()])
+    assert (await client.post("/api/v1/devices", headers=h, json=too_short)).status_code == 422
+
+    limit = get_settings().max_devices_per_user
+    for _ in range(limit):
+        r = await client.post("/api/v1/devices", headers=h, json=base)
+        assert r.status_code == 201
+    r = await client.post("/api/v1/devices", headers=h, json=base)
+    assert r.status_code == 409 and r.json()["detail"] == "device_limit_reached"
+
+    # Revoking one frees a slot.
+    devices = (await client.get("/api/v1/devices", headers=h)).json()
+    assert (await client.delete(f"/api/v1/devices/{devices[0]['id']}", headers=h)).status_code == 204
+    assert (await client.post("/api/v1/devices", headers=h, json=base)).status_code == 201

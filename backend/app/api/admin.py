@@ -259,7 +259,7 @@ async def put_settings(
     """Update operational toggles (admin only). Writes an audit_log entry."""
     changes = body.model_dump(exclude_none=True)
     if not changes:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "no settings provided")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "no settings provided")
     for key, value in changes.items():
         setting = await session.get(Setting, key)
         if setting is None:

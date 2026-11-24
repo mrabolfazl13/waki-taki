@@ -64,7 +64,7 @@ async def distribute_envelopes(
         ciphertext = env.get("envelope_ciphertext")
         if not isinstance(recipient_id, str) or not isinstance(ciphertext, str):
             raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid_envelope_fields"
+                status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid_envelope_fields"
             )
         dev = recipient_devices.get(recipient_id)
         if dev is None or dev.user_id not in member_user_ids:
@@ -72,7 +72,7 @@ async def distribute_envelopes(
         try:
             payload = base64.b64decode(ciphertext, validate=True)
         except Exception as e:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "envelope_not_base64") from e
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "envelope_not_base64") from e
         if len(payload) > settings.max_envelope_bytes:
             raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "envelope_too_large")
         session.add(
