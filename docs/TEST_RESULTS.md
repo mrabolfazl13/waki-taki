@@ -287,3 +287,23 @@ nginx 1.27.3 (Windows) was used to validate the shipped proxy configs without Do
 
 Not covered: Docker builds, certbot/real certificates, HTTP/2 over a real browser,
 and load through nginx.
+
+---
+
+# Test Results — dashboard ↔ backend contract check (Agent A, 2026-11-24)
+
+`web/scripts/contract-check.ts` (run via `npm run check:contracts`) validates the
+real API responses against the same Zod schemas the admin UI parses with.
+
+| Check group | Result |
+|---|---|
+| auth register/login + refresh rotation | ✅ |
+| `/admin/users`, `/admin/channels`, `/admin/security-events`, `/admin/audit` | ✅ |
+| `/admin/health`, `/admin/config`, `/admin/settings` (+ PUT round-trip) | ✅ |
+| `/admin/memberships`, `/admin/devices` | ✅ |
+| user disable → enable | ✅ |
+| per-user `/devices`, `/channels` | ✅ |
+| **Total** | **17/17 checks, `"ok": true`** on a fresh live API |
+
+Wired into `.github/workflows/capacity.yml` (starts the API, then runs the
+contract check before the 20-member load test).

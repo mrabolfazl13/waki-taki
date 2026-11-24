@@ -187,3 +187,10 @@
 - Details: Installed nginx 1.27.3 for Windows and validated both shipped configs with `nginx -t` (edge TLS/upstream/WS + SPA). Then ran the edge config locally against a live API and the built SPA with a self-signed cert: HTTPS API `/health`, SPA `index.html`, and a full **WSS** session (register → device → channel → `join` → `ping/pong`) through the proxy. Response headers confirmed: HSTS, CSP, X-Frame-Options DENY, Permissions-Policy.
 - Tests: `nginx -t` → both configs OK. `curl https://127.0.0.1:8443/health` → `{"status":"ok"}`; `wss://127.0.0.1:8443/ws` join/ping → `{"wss":"ok","joined":true,"ping":"pong"}`.
 - Acceptance: shipped proxy config terminates TLS, serves the SPA and upgrades WebSockets | Remaining: Docker image build + compose stack (no Docker daemon here), certbot issuance, real domain.
+
+### T-2.A1 — Dashboard ↔ backend contract check (automated)
+- Agent: A | Status: VERIFIED
+- Files: web/scripts/contract-check.ts, web/package.json, .github/workflows/capacity.yml
+- Details: New `npm run check:contracts` boots no browser: it logs in (or bootstraps an admin on an empty DB), calls every endpoint the dashboard consumes (auth login/refresh, admin users/channels/security-events/audit/health/config/settings/memberships/devices, settings round-trip, user disable/enable, per-user /devices and /channels) and parses each response with the exact Zod schemas the UI uses. It runs after the API is started in the capacity workflow, so schema drift now fails CI.
+- Tests: against a fresh live API → **17/17 checks pass, `"ok": true`**. TypeScript file is excluded from `tsc` (tsconfig includes only `src`), so it cannot break the dashboard build.
+- Acceptance: dashboard/backend contract verified automatically | Remaining: browser-level UI checks (no headless browser installed here).

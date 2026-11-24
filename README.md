@@ -27,6 +27,17 @@ python serve_local.py --port 8000      # Windows-safe selector loop; or `uvicorn
 `python scripts/multiinstance_check.py --a http://127.0.0.1:8000 --b http://127.0.0.1:8001`
 checks that two replicas share presence, floor control and media via Redis.
 
+## Dashboard contract check
+With a live API and an empty database (first registrant becomes admin):
+
+```bash
+cd web && npm ci && API_BASE=http://127.0.0.1:8000 npm run check:contracts
+```
+
+It validates every endpoint the dashboard uses against the UI's Zod schemas
+(against a non-empty DB, pass `ADMIN_USER`/`ADMIN_PASS`). CI runs it as part of
+the `capacity` workflow.
+
 ## Capacity / latency smoke test
 With a live API (dev: `uvicorn run_live:app --port 8000` inside `backend/`):
 

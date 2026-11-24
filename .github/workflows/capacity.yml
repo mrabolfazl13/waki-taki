@@ -34,6 +34,14 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dashboard dependencies
+        working-directory: web
+        run: npm ci --no-audit --no-fund
       - name: Start API
         run: |
           nohup python -u -m uvicorn run_live:app --host 127.0.0.1 --port 8000 \
@@ -47,6 +55,10 @@ jobs:
             sleep 1
           done
           echo "API failed to start"; tail -50 /tmp/api.log; exit 1
+      - name: Dashboard ↔ backend contract check
+        working-directory: web
+        run: |
+          API_BASE=http://127.0.0.1:8000 npm run check:contracts | tee /tmp/contract.json
       - name: Run 20-member capacity test
         working-directory: .
         run: |
@@ -56,6 +68,10 @@ jobs:
         if: always()
         run: |
           {
+            echo "### Dashboard contract"
+            echo '```json'
+            cat /tmp/contract.json 2>/dev/null || true
+            echo '```'
             echo "### Capacity / latency"
             echo '```json'
             cat /tmp/capacity.json 2>/dev/null || tail -50 /tmp/api.log
