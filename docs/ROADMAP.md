@@ -15,7 +15,7 @@ Statuses: NOT_STARTED / IN_PROGRESS / BLOCKED / IMPLEMENTED / TESTED / VERIFIED
 | 8 | 20-member capacity validation | VERIFIED locally (real PG/Redis: grant p95 5.95 ms, relay p95 8.42 ms, 21st → 409); Docker/nginx deployment pending |
 | 9 | Advanced UX (Bluetooth, background, diagnostics, a11y) | IMPLEMENTED + compiles into APK/AAB; on-device verification pending |
 | 10 | Security & performance audit | IN_PROGRESS (transport bounds, envelope caps, device revoke hardening landed; external audit pending) |
-| 11 | Production release (Docker, CI/CD, docs, artifacts) | IN_PROGRESS (compose/nginx/scripts/workflows authored; first real Docker build + CI green pending) |
+| 11 | Production release (Docker, CI/CD, docs, artifacts) | IN_PROGRESS (nginx TLS/WSS + configs verified locally; Docker image builds, compose stack and CI green still pending) |
 
 Dependency graph: 1 → (2, 3) → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11.
 Phases 2 (web) and 3+ (backend) and 2+ (Android) proceed in parallel across agents with file ownership per docs/AGENT_ASSIGNMENTS.md.

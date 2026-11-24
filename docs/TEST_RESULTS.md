@@ -269,3 +269,21 @@ Two uvicorn processes (ports 8011/8012) sharing one PostgreSQL + one Redis;
 So a client on replica A and a subscriber on replica B share presence, compete for
 one floor, and media published on A arrives on B. Not covered: nginx/TLS, Docker
 images, and more than two replicas.
+
+---
+
+# Test Results — edge nginx TLS/WSS smoke (Agent A, 2026-11-24)
+
+nginx 1.27.3 (Windows) was used to validate the shipped proxy configs without Docker.
+
+| Check | Result |
+|---|---|
+| `nginx -t` on `deploy/nginx/securetalk.conf` (upstreams pointed at localhost, self-signed cert) | **syntax ok / test successful** |
+| `nginx -t` on `web/nginx.conf` (SPA) | **syntax ok / test successful** |
+| `https://…/health` through the edge | `200 {"status":"ok"}` |
+| SPA `https://…/` through the edge | `index.html` served |
+| Response headers | `Strict-Transport-Security`, `Content-Security-Policy`, `X-Frame-Options: DENY`, `Permissions-Policy` present |
+| **WSS** `wss://…/ws?token=…` | register → device → channel → `join` → `joined` → `ping` → `pong` ✅ |
+
+Not covered: Docker builds, certbot/real certificates, HTTP/2 over a real browser,
+and load through nginx.
