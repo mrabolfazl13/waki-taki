@@ -39,3 +39,4 @@ Thumbs.db
 .zcode/
 ci-artifacts/
 backend/contract.db*
+release-artifacts/
