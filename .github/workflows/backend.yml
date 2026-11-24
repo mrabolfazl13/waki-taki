@@ -50,6 +50,9 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://securetalk:testpassword@127.0.0.1:5432/securetalk_test
       REDIS_URL: redis://127.0.0.1:6379/0
+      # Exercise the real Redis service, not fakeredis (tests opt in explicitly).
+      SECURETALK_TEST_REAL_REDIS: "1"
+      ST_REDIS_URL: redis://127.0.0.1:6379/0
       SECRET_KEY: ci-only-test-secret-key
     steps:
       - uses: actions/checkout@v4

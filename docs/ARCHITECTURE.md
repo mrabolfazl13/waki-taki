@@ -106,10 +106,14 @@ Base `/api/v1`. Auth: JWT access token (15 min) + refresh token (30 d, rotation)
 - `POST /channels/{id}/invites` → `{invite_code, qr_payload}` · `POST /invites/validate`
 - `POST /channels/{id}/members/{user_id}/remove` (owner/admin)
 - `POST /channels/{id}/keys/distribute` — upload sender-key envelopes `{recipient_device_id, envelope_ciphertext}`
-- `GET  /channels/{id}/keys/envelopes` — fetch envelopes addressed to me; ack + delete
+- `GET  /channels/{id}/keys/envelopes?device_id=…` — fetch envelopes addressed to my device
+- `POST /channels/{id}/keys/ack` `{envelope_ids}` — acknowledge (delete) delivered envelopes
 - `POST /channels/{id}/epoch/rotate` — bump epoch (owner or member-leave trigger)
 - `WS /ws?token=...` — signaling + floor + presence + relay (§4, §6)
-- Admin: `GET /admin/users`, `POST /admin/users/{id}/disable`, `GET /admin/channels`, `GET /admin/health`, `GET /admin/audit`, `GET /admin/security-events`, `POST /admin/roles`
+- Admin: `GET /admin/users`, `POST /admin/users/{id}/disable` · `…/enable`, `GET /admin/channels`,
+  `GET /admin/health`, `GET /admin/audit`, `GET /admin/security-events`, `POST /admin/roles`,
+  `GET /admin/memberships`, `GET /admin/devices`, `GET /admin/config`, `GET|PUT /admin/settings`
+- `GET /channels/{id}/members` — member roster (no key material); `GET /api/v1/health` alias
 - `GET /health` (no sensitive info)
 
 Constraints: max 20 members per channel (enforced server-side); Pydantic validation on all inputs; rate limiting on auth + invite endpoints; structured JSON logging with secret redaction.
