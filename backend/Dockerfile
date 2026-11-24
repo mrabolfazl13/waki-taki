@@ -48,4 +48,9 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -fsS http://127.0.0.1:8000/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+# --ws-max-size keeps the ASGI server from buffering multi-MB frames before the
+# application-level 64 KiB media / 16 KiB text limits are checked.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--ws-max-size", "262144", \
+     "--ws-ping-interval", "20", "--ws-ping-timeout", "20", \
+     "--timeout-keep-alive", "5"]

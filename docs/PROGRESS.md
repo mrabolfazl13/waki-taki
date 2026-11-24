@@ -158,3 +158,10 @@
 - Details: New CLI creates a 20-member channel (devices + 20 WebSockets), measures floor-grant latency and binary media relay latency over 20 rounds, and asserts the 21st member is rejected with `409 channel_full`.
 - Tests: against a live uvicorn (`run_live`, sqlite + fakeredis): floor grant **p50 1.68 ms / p95 4.97 ms / max 5.23 ms**; media relay **p50 2.60 ms / p95 6.07 ms / max 10.70 ms**; 20/20 frames delivered; 21st join → **409**. `ok: true`.
 - Acceptance: §8 cap enforced and PTT latency well under the 500 ms p95 budget in this environment | Remaining: re-run against real Postgres/Redis + multi-instance deployment; Android client latency not measured (no device).
+
+### T-10.A1 — Security audit + deploy hardening (phase 10/11)
+- Agent: A | Status: IMPLEMENTED
+- Files: docs/SECURITY_AUDIT.md, backend/Dockerfile, deploy/nginx/securetalk.conf, web/nginx.conf, deploy/.env.example, deploy/README.md
+- Details: Wrote a control-by-control audit (auth/session, key material, realtime/media, dashboard/edge, deployment) with explicit ✅/🟡/❌ status and an honest open-gap list (Android unverified, no external pentest, multi-instance untested, dashboard tokens in localStorage, no key-transparency UX). Hardening: uvicorn `--ws-max-size 262144` + WS ping interval/timeout in the API image; CSP + Permissions-Policy added to the edge nginx and the web image's nginx; removed the nonexistent `ADMIN_TOKEN` from `.env.example`/deploy README (admin endpoints authenticate with a JWT that has role=admin).
+- Tests: n/a for config; backend/web suites re-run green after the CMD/config edits (44→45 passed, 1 skipped).
+- Acceptance: audit documented with release gate | Remaining: every 🟡 item requires a Docker/TLS/Android/CI environment.

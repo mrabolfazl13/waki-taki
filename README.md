@@ -28,4 +28,6 @@ exits non-zero if a budget or check fails. Use a raised `AUTH_RATE_LIMIT` on the
 server (the script retries 429s, but a run needs 22 accounts).
 
 ## Progress
+Security/release review: [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md).
+
 Tracked in `docs/PROGRESS.md` with statuses NOT_STARTED → VERIFIED. Verified means acceptance criteria demonstrated; anything unverifiable in this environment is explicitly recorded in `docs/TEST_RESULTS.md` and `docs/KNOWN_ISSUES.md`.

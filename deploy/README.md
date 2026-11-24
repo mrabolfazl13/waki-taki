@@ -7,7 +7,7 @@ Stack: `api` (FastAPI/uvicorn, non-root) + `postgres:16` + `redis:7` + `nginx` (
 ```bash
 cd deploy
 cp .env.example .env
-# Generate secrets (do this for SECRET_KEY, POSTGRES_PASSWORD, ADMIN_TOKEN):
+# Generate secrets (do this for SECRET_KEY, POSTGRES_PASSWORD, INVITE_SECRET):
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 $EDITOR .env
 ```
@@ -89,4 +89,4 @@ Keep the last 2 image tags on the host; never `downgrade` more than one migratio
 
 - `.env` is chmod 600, gitignored, never committed.
 - Rotate `SECRET_KEY` only with a token-invalidation plan (it signs auth tokens).
-- Health endpoints: `/health` is public/liveness; `/health/details` is admin-gated (`ADMIN_TOKEN`).
+- Health endpoints: `/health` is public/liveness; `/health/details` requires an admin JWT (there is no shared admin token).
