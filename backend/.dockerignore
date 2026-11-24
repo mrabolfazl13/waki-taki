@@ -1,0 +1,13 @@
+# Local state that must never enter the image (keeps the build context small).
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+tests/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+run_live.py
+serve_local.py
