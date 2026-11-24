@@ -26,7 +26,6 @@ jobs:
       INVITE_CREATE_RATE_LIMIT: "500"
       JWT_SECRET: ci-capacity-secret-0123456789abcdef0123456789abcdef
       NO_PROXY: "127.0.0.1,localhost"
-      no_proxy: "127.0.0.1,localhost"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
