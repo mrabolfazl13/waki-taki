@@ -38,3 +38,4 @@ Thumbs.db
 .workbuddy-ai/
 .zcode/
 ci-artifacts/
+backend/contract.db*
