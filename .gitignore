@@ -40,3 +40,4 @@ Thumbs.db
 ci-artifacts/
 backend/contract.db*
 release-artifacts/
+secrets/
