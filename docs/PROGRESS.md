@@ -221,3 +221,10 @@
   - device 201, channel 201, **WSS** `wss://…/ws` join + ping/pong ✔
     (origin direct with `Host: wakitaki.absadeghi.ir` also returns `200 {"status":"ok"}`)
 - Remaining: `wakitaki.absadeghi.ir` is still **NXDOMAIN** on 1.1.1.1/8.8.8.8 — the Cloudflare zone needs that record pointing to the origin/proxy. Once present it will serve the same verified app.
+
+### T-11.A5 — Modernization pass: ops metrics, installable dashboard, CD pipeline
+- Agent: A | Status: DONE (local tests + build; production redeploy of api image pending)
+- Backend: dependency-free Prometheus `/metrics` (uptime, WS devices/users gauges, media frame/byte counters, floor grant/denial counters, per-route request counters via http middleware). Tests: `tests/test_metrics.py` (49 passed total locally).
+- Web: dashboard is now installable (PWA manifest + SVG icon + theme-color).
+- CI: new optional `deploy.yml` — builds both images and ships them to the production host over SSH, guarded by `DEPLOY_HOST`/`DEPLOY_USER`/`DEPLOY_SSH_KEY` secrets (job skips cleanly when unset).
+- Android: release builds are signed from `ANDROID_KEYSTORE_*` env (commit c638ac2); signed `app-release.apk` (6.0 MB) + signed AAB published on GitHub release v0.1.0.

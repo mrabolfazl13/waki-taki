@@ -5,10 +5,10 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import admin, auth, channels, devices, health, keys, users
+from .api import admin, auth, channels, devices, health, keys, metrics, users
 from .core.config import get_settings
 from .core.logging import setup_logging
 from .db import make_engine, make_redis, make_sessionmaker
@@ -96,6 +96,16 @@ def create_app() -> FastAPI:
         await engine.dispose()
 
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
+    @app.middleware("http")
+    async def _observe_requests(request: Request, call_next):
+        from .api.metrics import observe_request
+
+        response = await call_next(request)
+        route = request.scope.get("route")
+        path = getattr(route, "path", request.url.path)
+        observe_request(request.method, path, response.status_code)
+        return response
+
     origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
     if origins:
         app.add_middleware(
@@ -106,6 +116,7 @@ def create_app() -> FastAPI:
             allow_headers=["Authorization", "Content-Type"],
         )
     app.include_router(health.router)
+    app.include_router(metrics.router)
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(devices.router, prefix="/api/v1")
     app.include_router(users.router, prefix="/api/v1")

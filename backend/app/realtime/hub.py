@@ -136,12 +136,17 @@ class Hub:
     # ---------- media relay ----------
 
     async def _fanout_media(self, channel_id: str, frame: bytes, exclude_device: str | None) -> None:
+        from ..api.metrics import observe_media
+
+        sent = 0
         for conn in list(self.conns.values()):
             if conn.channel_id == channel_id and conn.device_id != exclude_device:
                 try:
                     await conn.ws.send_bytes(frame)
+                    sent += 1
                 except Exception:
                     log.exception("media fanout send failed")
+        observe_media(sent, sent * len(frame))
 
     async def handle_media(self, conn: Conn, data: bytes) -> None:
         if len(data) > settings.max_media_frame_bytes:
@@ -385,6 +390,9 @@ class Hub:
             self.redis, channel_id, device_id, is_admin=is_admin, override=override
         )
         if result.granted:
+            from ..api.metrics import observe_floor
+
+            observe_floor(True)
             await safe_send(
                 conn.ws,
                 {"type": "floor.granted", "data": {
@@ -394,6 +402,9 @@ class Hub:
             )
             await self._broadcast_floor_state(channel_id, exclude=device_id)
         else:
+            from ..api.metrics import observe_floor
+
+            observe_floor(False)
             await safe_send(
                 conn.ws,
                 {"type": "floor.denied", "data": {

@@ -1,6 +1,6 @@
 # Current State
 
-**Updated:** 2026-11-24 · **Phase:** 1 verified; 2–9 implemented, 8 tested locally; 10–11 in progress
+**Updated:** 2026-11-25 · **Phase:** 1 verified; 2–9 implemented, 8 tested locally; 10–11 in progress
 
 ## Done
 - Phase 0: audit, architecture contracts, decisions (greenfield).

@@ -1,0 +1,67 @@
+# Optional continuous deployment to the production host.
+# Enable by adding repository secrets:
+#   DEPLOY_HOST     e.g. 2.189.255.225
+#   DEPLOY_USER     e.g. ubuntu
+#   DEPLOY_SSH_KEY  private key (PEM) with docker compose access on the host
+# Without these secrets the job is skipped, so normal pushes stay green.
+name: deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check secrets present
+        id: guard
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -n "$HOST" ] && [ -n "$USER" ] && [ -n "$KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY not set — skipping deploy."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.guard.outputs.enabled == 'true'
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.guard.outputs.enabled == 'true'
+
+      - name: Build images
+        if: steps.guard.outputs.enabled == 'true'
+        run: |
+          docker build -t securetalk/api:latest backend
+          docker build -t securetalk/web:latest web
+
+      - name: Ship images + compose up
+        if: steps.guard.outputs.enabled == 'true'
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          echo "$KEY" > key.pem && chmod 600 key.pem
+          SSH="ssh -i key.pem -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=10 $USER@$HOST"
+          docker save securetalk/api:latest | gzip | $SSH 'gunzip | docker load'
+          docker save securetalk/web:latest | gzip | $SSH 'gunzip | docker load'
+          $SSH 'cd /home/ubuntu/wakitaki && docker compose up -d && sleep 10 && docker compose ps'
+      - name: Smoke check
+        if: steps.guard.outputs.enabled == 'true'
+        run: |
+          sleep 5
+          curl -fsS https://wakitaki.sadsirco.ir/health | grep -q '"status":"ok"'
+          echo "public health OK"
