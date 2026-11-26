@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import admin, auth, channels, devices, health, keys, metrics, users
+from .api import admin, auth, channels, crash, devices, health, keys, metrics, users
 from .core.config import get_settings
 from .core.logging import setup_logging
 from .db import make_engine, make_redis, make_sessionmaker
@@ -116,6 +116,7 @@ def create_app() -> FastAPI:
             allow_headers=["Authorization", "Content-Type"],
         )
     app.include_router(health.router)
+    app.include_router(crash.router, prefix="/api/v1")
     app.include_router(metrics.router)
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(devices.router, prefix="/api/v1")
