@@ -23,7 +23,7 @@ from ..core.security import (
 )
 from ..deps import get_db, get_redis, record_security_event
 from ..models import RefreshToken, Role, SignupInvite, User, utcnow
-from ..schemas import LoginIn, RefreshIn, RegisterIn, SignupInviteCreateIn, SignupInviteOut, TokenPair
+from ..schemas import LoginIn, RefreshIn, RegisterIn, TokenPair
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
