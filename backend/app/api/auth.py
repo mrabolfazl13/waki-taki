@@ -1,6 +1,9 @@
 """Auth endpoints: register, login, refresh (rotation), logout."""
 from __future__ import annotations
 
+import hashlib
+import hmac
+import secrets
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -19,11 +22,39 @@ from ..core.security import (
     verify_password,
 )
 from ..deps import get_db, get_redis, record_security_event
-from ..models import RefreshToken, Role, User, utcnow
-from ..schemas import LoginIn, RefreshIn, RegisterIn, TokenPair
+from ..models import RefreshToken, Role, SignupInvite, User, utcnow
+from ..schemas import LoginIn, RefreshIn, RegisterIn, SignupInviteCreateIn, SignupInviteOut, TokenPair
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
+
+
+def _invite_code_hash(code: str) -> str:
+    key = (settings.invite_secret or settings.jwt_secret).encode()
+    return hmac.new(key, code.encode(), hashlib.sha256).hexdigest()
+
+
+def _new_invite_code() -> str:
+    alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no I/L/O/0/1: unambiguous
+    body = "".join(secrets.choice(alphabet) for _ in range(8))
+    return f"WT-{body[:4]}-{body[4:]}"
+
+
+async def _consume_signup_invite(session: AsyncSession, code: str) -> SignupInvite:
+    from datetime import UTC, datetime
+
+    invite = await session.scalar(select(SignupInvite).where(SignupInvite.code_hash == _invite_code_hash(code)))
+    if invite is None:
+        await record_security_event(
+            session, "signup.invite_invalid", severity="warning", detail={"code_prefix": code[:3]}
+        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid_invite_code")
+    now = datetime.now(UTC)
+    if invite.expires_at.replace(tzinfo=UTC) < now:
+        raise HTTPException(status.HTTP_410_GONE, "invite_expired")
+    if invite.used_by is not None:
+        raise HTTPException(status.HTTP_410_GONE, "invite_already_used")
+    return invite
 
 
 def _pair(user: User) -> tuple[str, str, str]:
@@ -64,8 +95,15 @@ async def register(
     existing = await session.scalar(select(User).where(User.display_name == body.display_name))
     if existing is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "display_name_taken")
-    # Bootstrap: first account on an empty system becomes admin.
+    # Bootstrap: first account on an empty system becomes admin (and is exempt
+    # from the invite gate so the system can be provisioned at all).
     any_user = await session.scalar(select(User.id).limit(1))
+    # Invite gate: every later signup needs a valid single-use code.
+    invite: SignupInvite | None = None
+    if settings.signup_invite_required and any_user is not None:
+        if not body.invite_code:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "invite_required")
+        invite = await _consume_signup_invite(session, body.invite_code)
     role = Role.ADMIN if (any_user is None and settings.bootstrap_admin_enabled) else Role.USER
     user = User(
         display_name=body.display_name,
@@ -73,6 +111,10 @@ async def register(
         role=role,
     )
     session.add(user)
+    if invite is not None:
+        await session.flush()  # assign user.id before linking the invite
+        invite.used_by = user.id
+        invite.used_at = utcnow()
     await session.commit()
     await record_security_event(session, "account.created", user_id=user.id)
     access, refresh, jti = _pair(user)

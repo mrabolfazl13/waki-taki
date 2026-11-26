@@ -183,6 +183,20 @@ class Revocation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class SignupInvite(Base):
+    """Single-use registration invite code (only the HMAC of the code is stored)."""
+
+    __tablename__ = "signup_invites"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True)  # sha256 hex
+    created_by: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class RefreshToken(Base):
     """Refresh token rotation: only the current jti per user is valid."""
 

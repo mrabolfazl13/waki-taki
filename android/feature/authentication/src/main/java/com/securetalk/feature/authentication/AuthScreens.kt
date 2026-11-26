@@ -30,7 +30,7 @@ fun LoginScreen(
     onGoRegister: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel(),
 ) {
-    AuthForm(title = "Log in", submitLabel = "LOG IN", needsPassword = true, onGoOther = onGoRegister, onSuccess = onSuccess, viewModel = viewModel, submit = viewModel::login)
+    AuthForm(title = "Log in", submitLabel = "LOG IN", needsPassword = true, onGoOther = onGoRegister, onSuccess = onSuccess, viewModel = viewModel, submit = { n, p, _ -> viewModel.login(n, p) })
 }
 
 @Composable
@@ -50,11 +50,13 @@ private fun AuthForm(
     onGoOther: () -> Unit,
     onSuccess: () -> Unit,
     viewModel: AuthViewModel,
-    submit: (String, String?) -> Unit,
+    submit: (String, String?, String?) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var displayName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var inviteCode by remember { mutableStateOf("") }
+    val isRegister = needsPassword
 
     Column(
         modifier = Modifier
@@ -80,6 +82,15 @@ private fun AuthForm(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = inviteCode,
+                onValueChange = { inviteCode = it.uppercase() },
+                label = { Text("Invite code (from an admin)") },
+                placeholder = { Text("WT-XXXX-XXXX") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
         }
         Spacer(Modifier.height(20.dp))
         when (val state = uiState) {
@@ -94,7 +105,7 @@ private fun AuthForm(
         }
         Button(
             onClick = {
-                submit(displayName, password.takeIf { it.isNotBlank() })
+                submit(displayName, password.takeIf { it.isNotBlank() }, inviteCode.takeIf { it.isNotBlank() })
             },
             enabled = uiState !is AuthUiState.Loading,
             modifier = Modifier.fillMaxWidth(),

@@ -28,14 +28,14 @@ class AuthViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    fun register(displayName: String, password: String?) {
+    fun register(displayName: String, password: String?, inviteCode: String? = null) {
         if (displayName.isBlank()) {
             _uiState.value = AuthUiState.Error("Display name required")
             return
         }
         _uiState.value = AuthUiState.Loading
         viewModelScope.launch {
-            auth.register(displayName, password?.takeIf { it.isNotBlank() })
+            auth.register(displayName, password?.takeIf { it.isNotBlank() }, inviteCode)
                 .onSuccess { _uiState.value = AuthUiState.Done }
                 .onFailure { _uiState.value = AuthUiState.Error(it.message ?: "Registration failed") }
         }

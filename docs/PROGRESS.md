@@ -233,3 +233,15 @@
 - Rebuilt both images (api 60d71c695f7d, web c450e3c06456), shipped via `docker save|gzip|ssh docker load`, `docker compose up -d`.
 - Verified on the host and from the public internet: `/health` 200, SPA 200, `/manifest.webmanifest` 200, `/metrics` serves Prometheus text format.
 - Host memory stable (~640 MB available, swap active); CI all six workflows green at 23f6f88.
+
+### T-11.A7 — Single-use signup invite codes (2026-11-26)
+- Backend: `signup_invites` table (migration 0003, up/down verified), admin endpoints
+  `POST /admin/invites` (mint, raw code shown once), `GET /admin/invites`, `DELETE /admin/invites/{id}`
+  (revoke unused). Register gate: with `SIGNUP_INVITE_REQUIRED=true`, every signup except the very
+  first (bootstrap admin) must present a valid unused, unexpired code; invalid → 403
+  `invalid_invite_code` / used or expired → 410. Codes stored only as HMAC-SHA256.
+- Tests: 4 new (53 passed total). Android: invite-code field on the register screen, wired through
+  AuthViewModel/Repository/API; `assembleDebug` + unit tests green. Dashboard: new "Signup Invites"
+  page (mint/copy/list/revoke), tsc + build green.
+- Production: images redeployed, migration applied, `SIGNUP_INVITE_REQUIRED=true` set. Live checks:
+  no-code register → 403, mint → 201, use → 201, reuse → 410.

@@ -16,11 +16,86 @@ from ..models import (
     Role,
     SecurityEvent,
     Setting,
+    SignupInvite,
     User,
 )
-from ..schemas import AdminRoleIn, AdminSettingsIn, AdminSettingsOut, UserOut
+from ..schemas import (
+    AdminRoleIn,
+    AdminSettingsIn,
+    AdminSettingsOut,
+    SignupInviteCreateIn,
+    SignupInviteOut,
+    UserOut,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.post("/invites", response_model=SignupInviteOut, status_code=201)
+async def create_signup_invite(
+    body: SignupInviteCreateIn | None = None,
+    admin: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_db),
+) -> SignupInviteOut:
+    """Mint a single-use signup invite code. The raw code is returned exactly once."""
+    from datetime import UTC, datetime, timedelta
+
+    from ..api.auth import _invite_code_hash, _new_invite_code
+
+    code = _new_invite_code()
+    ttl = body.ttl_hours if body else 72
+    now = datetime.now(UTC)
+    invite = SignupInvite(
+        code_hash=_invite_code_hash(code),
+        created_by=admin.id,
+        expires_at=now + timedelta(hours=ttl),
+    )
+    session.add(invite)
+    await session.commit()
+    await record_audit(session, admin.id, "invite.created", "invite", {"invite_id": invite.id})
+    return SignupInviteOut(
+        id=invite.id,
+        created_by=admin.id,
+        created_at=now.isoformat(),
+        expires_at=invite.expires_at.isoformat(),
+        code=code,
+    )
+
+
+@router.get("/invites", response_model=list[SignupInviteOut])
+async def list_signup_invites(
+    admin: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_db),
+    limit: int = Query(default=100, le=500),
+) -> list[SignupInviteOut]:
+    rows = (await session.scalars(select(SignupInvite).order_by(SignupInvite.created_at.desc()).limit(limit))).all()
+    return [
+        SignupInviteOut(
+            id=i.id,
+            created_by=i.created_by,
+            created_at=i.created_at.isoformat(),
+            expires_at=i.expires_at.isoformat(),
+            used_by=i.used_by,
+            used_at=i.used_at.isoformat() if i.used_at else None,
+        )
+        for i in rows
+    ]
+
+
+@router.delete("/invites/{invite_id}", status_code=204)
+async def revoke_signup_invite(
+    invite_id: str,
+    admin: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_db),
+) -> None:
+    invite = await session.get(SignupInvite, invite_id)
+    if invite is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "invite_not_found")
+    if invite.used_by is not None:
+        raise HTTPException(status.HTTP_410_GONE, "invite_already_used")
+    await session.delete(invite)
+    await session.commit()
+    await record_audit(session, admin.id, "invite.revoked", "invite", {"invite_id": invite_id})
 
 
 @router.get("/users", response_model=list[UserOut])

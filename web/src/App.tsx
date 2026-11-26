@@ -14,6 +14,7 @@ import NetworkDiagnosticsPage from "./pages/NetworkDiagnosticsPage";
 import ConfigurationPage from "./pages/ConfigurationPage";
 import SystemSettingsPage from "./pages/SystemSettingsPage";
 import AdminRolesPage from "./pages/AdminRolesPage";
+import InvitesPage from "./pages/InvitesPage";
 import AccessControlPage from "./pages/AccessControlPage";
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/configuration" element={<ConfigurationPage />} />
         <Route path="/system-settings" element={<SystemSettingsPage />} />
         <Route path="/admin-roles" element={<AdminRolesPage />} />
+        <Route path="/invites" element={<InvitesPage />} />
         <Route path="/access-control" element={<AccessControlPage />} />
       </Route>
       <Route path="*" element={<RequireAuth />} />

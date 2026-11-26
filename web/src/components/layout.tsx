@@ -18,6 +18,7 @@ const navItems: { to: string; label: string }[] = [
   { to: "/configuration", label: "Configuration" },
   { to: "/system-settings", label: "System Settings" },
   { to: "/admin-roles", label: "Administrator Roles" },
+  { to: "/invites", label: "Signup Invites" },
   { to: "/access-control", label: "Access Control" },
 ];
 

@@ -96,7 +96,7 @@ interface SecureTalkApi {
 // ---- DTOs ------------------------------------------------------------------------------
 
 @Serializable
-data class RegisterRequest(val display_name: String, val password: String? = null)
+data class RegisterRequest(val display_name: String, val password: String? = null, val invite_code: String? = null)
 
 @Serializable
 data class LoginRequest(val display_name: String, val password: String? = null)

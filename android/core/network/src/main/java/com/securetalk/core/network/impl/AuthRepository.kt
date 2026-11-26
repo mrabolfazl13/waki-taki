@@ -50,8 +50,8 @@ class AuthRepository(
         deviceUsers[deviceId] = userId
     }
 
-    suspend fun register(displayName: String, password: String?): Result<SessionInfo> = try {
-        val response = api.register(RegisterRequest(displayName, password))
+    suspend fun register(displayName: String, password: String?, inviteCode: String? = null): Result<SessionInfo> = try {
+        val response = api.register(RegisterRequest(displayName, password, inviteCode?.trim()?.takeIf { it.isNotEmpty() }))
         applyAuth(displayName, response)
     } catch (e: Exception) {
         Result.failure(e)

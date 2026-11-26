@@ -41,6 +41,14 @@ class Settings(BaseSettings):
         default=None, validation_alias=AliasChoices("ST_INVITE_SECRET", "INVITE_SECRET")
     )
 
+    # Require a valid single-use admin invite code at /auth/register.
+    signup_invite_required: bool = Field(
+        default=False, validation_alias=AliasChoices("ST_SIGNUP_INVITE_REQUIRED", "SIGNUP_INVITE_REQUIRED")
+    )
+    signup_invite_ttl_hours: int = Field(
+        default=72, validation_alias=AliasChoices("ST_SIGNUP_INVITE_TTL_HOURS", "SIGNUP_INVITE_TTL_HOURS")
+    )
+
     # Comma-separated browser origins allowed by CORS (empty = same-origin only).
     allowed_origins: str = Field(
         default="", validation_alias=AliasChoices("ST_ALLOWED_ORIGINS", "ALLOWED_ORIGINS")

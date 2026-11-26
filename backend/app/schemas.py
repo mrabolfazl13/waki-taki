@@ -9,6 +9,14 @@ from pydantic import BaseModel, Field, StrictBool, field_validator, model_valida
 class RegisterIn(BaseModel):
     display_name: str = Field(min_length=1, max_length=64)
     password: str | None = Field(default=None, min_length=8, max_length=128)
+    invite_code: str | None = Field(default=None, min_length=4, max_length=64)
+
+    @field_validator("invite_code")
+    @classmethod
+    def strip_code(cls, v: str | None) -> str | None:
+        if v is not None:
+            v = v.strip().upper() or None
+        return v
 
     @field_validator("display_name")
     @classmethod
@@ -17,6 +25,21 @@ class RegisterIn(BaseModel):
         if not v:
             raise ValueError("display_name must not be blank")
         return v
+
+
+class SignupInviteCreateIn(BaseModel):
+    ttl_hours: int = Field(default=72, ge=1, le=24 * 30)
+
+
+class SignupInviteOut(BaseModel):
+    id: str
+    created_by: str
+    created_at: str
+    expires_at: str
+    used_by: str | None = None
+    used_at: str | None = None
+    # Only present in the create response, so the raw code is shown once.
+    code: str | None = None
 
 
 class LoginIn(BaseModel):
