@@ -41,3 +41,10 @@ ci-artifacts/
 backend/contract.db*
 release-artifacts/
 secrets/
+ch1.xml
+gi.xml
+imgx.xml
+rep*.xml
+r*.xml
+big.xml
+img.xml
