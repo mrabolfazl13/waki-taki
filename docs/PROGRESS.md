@@ -228,3 +228,8 @@
 - Web: dashboard is now installable (PWA manifest + SVG icon + theme-color).
 - CI: new optional `deploy.yml` — builds both images and ships them to the production host over SSH, guarded by `DEPLOY_HOST`/`DEPLOY_USER`/`DEPLOY_SSH_KEY` secrets (job skips cleanly when unset).
 - Android: release builds are signed from `ANDROID_KEYSTORE_*` env (commit c638ac2); signed `app-release.apk` (6.0 MB) + signed AAB published on GitHub release v0.1.0.
+
+### T-11.A6 — Production redeploy with /metrics + PWA (2026-11-26)
+- Rebuilt both images (api 60d71c695f7d, web c450e3c06456), shipped via `docker save|gzip|ssh docker load`, `docker compose up -d`.
+- Verified on the host and from the public internet: `/health` 200, SPA 200, `/manifest.webmanifest` 200, `/metrics` serves Prometheus text format.
+- Host memory stable (~640 MB available, swap active); CI all six workflows green at 23f6f88.
