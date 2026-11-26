@@ -36,7 +36,7 @@ android {
     }
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false // startup crash reported on device; disable R8 until profiled
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Unsigned release builds stay valid (AAB for CI); APK needs a key to install.
             signingConfig = signingConfigs.getByName("release").takeIf { it.storeFile != null }
