@@ -10,14 +10,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -27,8 +26,15 @@ import com.securetalk.core.common.domain.ChannelManager
 import com.securetalk.core.common.domain.ParticipantPresence
 import com.securetalk.core.common.model.ChannelId
 import com.securetalk.core.common.model.Member
+import com.securetalk.core.common.model.MemberRole
+import com.securetalk.core.design.StAvatar
+import com.securetalk.core.design.StButton
+import com.securetalk.core.design.StButtonStyle
+import com.securetalk.core.design.StCard
+import com.securetalk.core.design.StChip
+import com.securetalk.core.design.StTopBar
 import com.securetalk.core.design.StateBlock
-import com.securetalk.core.design.StColors
+import com.securetalk.core.design.stTokens
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -74,6 +80,7 @@ class MembersViewModel @Inject constructor(
     }
 }
 
+/** Member roster: avatar, presence, role, mic state; owner can remove members. */
 @Composable
 fun MembersScreen(
     channelId: String,
@@ -83,30 +90,28 @@ fun MembersScreen(
     val members by viewModel.members.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val t = stTokens()
 
     LaunchedEffect(channelId) { viewModel.load(channelId) }
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Members", style = MaterialTheme.typography.titleLarge)
-            Text(
-                "${members.size}/20",
-                style = MaterialTheme.typography.labelLarge,
-                color = StColors.GreyText,
-            )
-        }
+        StTopBar(
+            title = "Members",
+            trailing = { StChip("${members.size}/20") },
+        )
 
         error?.let {
-            Text(it, color = StColors.TxRed, modifier = Modifier.padding(horizontal = 16.dp))
+            Text(it, color = t.txRed, modifier = Modifier.padding(horizontal = 16.dp))
         }
 
         when {
-            loading -> StateBlock(title = "Loading members...", loading = true)
+            loading -> Column {
+                repeat(4) {
+                    StCard(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                        Text("Loading members…", style = MaterialTheme.typography.bodyMedium, color = t.greyText)
+                    }
+                }
+            }
             members.isEmpty() -> StateBlock(
                 title = "No members cached",
                 detail = "Members are loaded from the server or host. Invite people to add them.",
@@ -115,28 +120,38 @@ fun MembersScreen(
             )
             else -> LazyColumn(Modifier.weight(1f)) {
                 items(members, key = { it.deviceId.value }) { member ->
-                    Card(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                    ) {
+                    StCard(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                         Row(
-                            Modifier.padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
+                            val speaking = member.state.name == "SPEAKING"
+                            StAvatar(member.displayName, speaking = speaking, size = 42.dp)
                             Column(Modifier.weight(1f)) {
                                 Text(member.displayName, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    "${member.role.name.lowercase()} · ${member.state.name.lowercase()}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = StColors.GreyText,
-                                )
-                            }
-                            if (member.role != com.securetalk.core.common.model.MemberRole.OWNER) {
-                                Button(onClick = { viewModel.remove(channelId, member.deviceId.value) }) {
-                                    Text("REMOVE")
+                                Spacer(Modifier.height(2.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    StChip(
+                                        member.role.name.lowercase(),
+                                        accent = if (member.role == MemberRole.OWNER) t.lime else null,
+                                    )
+                                    StChip(
+                                        member.state.name.lowercase(),
+                                        accent = when (member.state.name) {
+                                            "SPEAKING" -> t.txRed
+                                            "ONLINE" -> t.emerald
+                                            else -> null
+                                        },
+                                    )
                                 }
+                            }
+                            if (member.role != MemberRole.OWNER) {
+                                StButton(
+                                    "REMOVE",
+                                    { viewModel.remove(channelId, member.deviceId.value) },
+                                    style = StButtonStyle.Ghost,
+                                    compact = true,
+                                )
                             }
                         }
                     }
@@ -144,12 +159,13 @@ fun MembersScreen(
             }
         }
 
-        Button(
-            onClick = { onInvite(channelId) },
-            modifier = Modifier
+        StButton(
+            "INVITE MEMBERS",
+            { onInvite(channelId) },
+            Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-        ) { Text("INVITE MEMBERS") }
+        )
         Spacer(Modifier.height(8.dp))
     }
 }

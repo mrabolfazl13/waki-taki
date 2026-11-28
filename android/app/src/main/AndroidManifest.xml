@@ -19,6 +19,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.SecureTalk"
         android:usesCleartextTraffic="false">
+        <provider
+            android:name=".CrashReporterProvider"
+            android:authorities="${applicationId}.crashreporter"
+            android:exported="false"
+            android:initOrder="100" />
+
 
         <activity
             android:name=".MainActivity"

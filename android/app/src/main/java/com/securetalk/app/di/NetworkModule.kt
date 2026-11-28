@@ -130,7 +130,7 @@ object AppModule {
     private fun normalizeApiOrigin(url: String): String {
         val trimmed = url.trim()
         val origin = trimmed.substringBefore("/api/v1").trimEnd('/')
-        return if (origin.startsWith("http://") || origin.startsWith("https://")) "$origin/" else "https://localhost/"
+        return if (origin.startsWith("http://") || origin.startsWith("https://")) "$origin/" else "https://wakitaki.sadsirco.ir/"
     }
 
     class BaseUrl(url: String) {

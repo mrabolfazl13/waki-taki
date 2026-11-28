@@ -7,10 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -18,11 +15,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.securetalk.core.design.StButton
+import com.securetalk.core.design.StButtonStyle
+import com.securetalk.core.design.StCard
+import com.securetalk.core.design.StTextField
+import com.securetalk.core.design.StTopBar
 import com.securetalk.core.design.StateBlock
-import com.securetalk.core.design.StColors
+import com.securetalk.core.design.stTokens
 
 @Composable
 fun LoginScreen(
@@ -56,63 +59,64 @@ private fun AuthForm(
     var displayName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var inviteCode by remember { mutableStateOf("") }
-    val isRegister = needsPassword
+    val t = stTokens()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(vertical = 24.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(title, style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
-        OutlinedTextField(
-            value = displayName,
-            onValueChange = { displayName = it },
-            label = { Text("Display name") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-        )
-        if (needsPassword) {
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password (optional)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = inviteCode,
-                onValueChange = { inviteCode = it.uppercase() },
-                label = { Text("Invite code (from an admin)") },
-                placeholder = { Text("WT-XXXX-XXXX") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-        }
-        Spacer(Modifier.height(20.dp))
-        when (val state = uiState) {
-            is AuthUiState.Error -> {
-                Text(state.message, color = StColors.TxRed, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(8.dp))
-            }
-            AuthUiState.Loading -> {
-                StateBlock(title = "Contacting server...", loading = true)
-            }
-            else -> Unit
-        }
-        Button(
-            onClick = {
-                submit(displayName, password.takeIf { it.isNotBlank() }, inviteCode.takeIf { it.isNotBlank() })
-            },
-            enabled = uiState !is AuthUiState.Loading,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(submitLabel) }
+        StTopBar(title = title)
         Spacer(Modifier.height(8.dp))
-        Button(onClick = onGoOther, modifier = Modifier.fillMaxWidth()) {
-            Text(if (title == "Log in") "CREATE ACCOUNT INSTEAD" else "LOG IN INSTEAD")
+        StCard(Modifier.padding(horizontal = 16.dp)) {
+            StTextField(
+                value = displayName,
+                onValueChange = { displayName = it },
+                label = "Display name",
+            )
+            if (needsPassword) {
+                Spacer(Modifier.height(12.dp))
+                StTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = "Password (optional)",
+                )
+                Spacer(Modifier.height(12.dp))
+                StTextField(
+                    value = inviteCode,
+                    onValueChange = { inviteCode = it.uppercase() },
+                    label = "Invite code (from an admin)",
+                    placeholder = "WT-XXXX-XXXX",
+                )
+            }
+            when (val state = uiState) {
+                is AuthUiState.Error -> {
+                    Spacer(Modifier.height(10.dp))
+                    Text(state.message, color = t.txRed, style = MaterialTheme.typography.bodyMedium)
+                }
+                AuthUiState.Loading -> {
+                    Spacer(Modifier.height(10.dp))
+                    StateBlock(title = "Contacting server…", loading = true)
+                }
+                else -> Unit
+            }
+            Spacer(Modifier.height(16.dp))
+            StButton(
+                submitLabel,
+                {
+                    submit(displayName, password.takeIf { it.isNotBlank() }, inviteCode.takeIf { it.isNotBlank() })
+                },
+                enabled = uiState !is AuthUiState.Loading,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            StButton(
+                if (title == "Log in") "CREATE ACCOUNT INSTEAD" else "LOG IN INSTEAD",
+                onGoOther,
+                modifier = Modifier.fillMaxWidth(),
+                style = StButtonStyle.Ghost,
+            )
         }
     }
 
@@ -131,24 +135,23 @@ fun DeviceVerificationScreen(
     viewModel: AuthViewModel = hiltViewModel(),
 ) {
     val session by viewModel.session.collectAsState()
+    val t = stTokens()
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(vertical = 24.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("Device verified", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text("SIGNED IN AS", style = MaterialTheme.typography.labelLarge)
-                Text(session.displayName.ifBlank { "unknown" }, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(12.dp))
-                Text("DEVICE ID", style = MaterialTheme.typography.labelLarge)
-                Text(session.deviceId.ifBlank { "pending registration" }, style = MaterialTheme.typography.bodyMedium)
-            }
+        StTopBar(title = "Device verified")
+        Spacer(Modifier.height(8.dp))
+        StCard(Modifier.padding(horizontal = 16.dp), accent = t.emerald) {
+            Text("SIGNED IN AS", style = MaterialTheme.typography.labelLarge, color = t.greyText)
+            Text(session.displayName.ifBlank { "unknown" }, style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(12.dp))
+            Text("DEVICE ID", style = MaterialTheme.typography.labelLarge, color = t.greyText)
+            Text(session.deviceId.ifBlank { "pending registration" }, style = MaterialTheme.typography.labelMedium)
         }
-        Spacer(Modifier.height(24.dp))
-        Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text("CONTINUE") }
+        Spacer(Modifier.height(20.dp))
+        StButton("CONTINUE", onDone, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
     }
 }

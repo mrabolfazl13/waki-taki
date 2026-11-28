@@ -2,13 +2,13 @@ package com.securetalk.feature.devices
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,8 +20,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.securetalk.core.design.StateBlock
+import com.securetalk.core.design.StButton
+import com.securetalk.core.design.StButtonStyle
+import com.securetalk.core.design.StCard
+import com.securetalk.core.design.StChip
 import com.securetalk.core.design.StColors
+import com.securetalk.core.design.StTopBar
+import com.securetalk.core.design.StateBlock
+import com.securetalk.core.design.stTokens
 import com.securetalk.core.network.api.DeviceResponse
 import com.securetalk.core.network.api.SecureTalkApi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -75,14 +81,11 @@ fun DevicesScreen(
 
     LaunchedEffect(Unit) { viewModel.load() }
 
+    val t = stTokens()
     Column(Modifier.fillMaxSize()) {
-        Text(
-            "Devices",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp),
-        )
+        StTopBar(title = "Devices", trailing = { StChip("${devices.size} REGISTERED") })
         error?.let {
-            Text(it, color = StColors.TxRed, modifier = Modifier.padding(horizontal = 16.dp))
+            Text(it, color = t.txRed, modifier = Modifier.padding(horizontal = 16.dp))
         }
         when {
             loading -> StateBlock(title = "Loading devices...", loading = true)
@@ -94,27 +97,26 @@ fun DevicesScreen(
             )
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 items(devices, key = { it.device_id }) { device ->
-                    Card(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                    ) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(device.name, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                device.device_id,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = StColors.GreyText,
-                            )
-                            Text(
-                                "identity: ${device.identity_pubkey.take(16)}…",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = StColors.Teal,
-                            )
-                            Button(onClick = { viewModel.revoke(device.device_id) }) {
-                                Text("REVOKE")
-                            }
-                        }
+                    StCard(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                        Text(device.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            device.device_id,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = t.greyText,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "identity: ${device.identity_pubkey.take(16)}…",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = t.teal,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        StButton(
+                            "REVOKE",
+                            { viewModel.revoke(device.device_id) },
+                            style = StButtonStyle.Ghost,
+                            compact = true,
+                        )
                     }
                 }
             }

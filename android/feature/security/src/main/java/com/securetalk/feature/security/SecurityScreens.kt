@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,7 +21,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.securetalk.core.common.domain.SecureSessionManager
 import com.securetalk.core.common.domain.GroupKeyManager
+import com.securetalk.core.design.StButton
+import com.securetalk.core.design.StButtonStyle
+import com.securetalk.core.design.StCard
 import com.securetalk.core.design.StColors
+import com.securetalk.core.design.StChip
+import com.securetalk.core.design.StTopBar
+import com.securetalk.core.design.stTokens
 import com.securetalk.core.security.engine.CryptoEngine
 import com.securetalk.core.security.session.DeviceIdentityManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -95,53 +99,54 @@ fun SecurityOverviewScreen(
     val overview by viewModel.overview.collectAsState()
     val action by viewModel.action.collectAsState()
 
+    val t = stTokens()
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState()),
     ) {
-        Text("Security", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
+        StTopBar(
+            title = "Security",
+            trailing = { StChip("E2E AES-256-GCM", accent = t.emerald) },
+        )
+        Spacer(Modifier.height(4.dp))
         val o = overview
         if (o == null) {
-            androidx.compose.material3.CircularProgressIndicator(color = StColors.Amber)
+            StCard(Modifier.padding(horizontal = 16.dp)) {
+                Text("Loading security overview…", style = MaterialTheme.typography.bodyMedium, color = t.greyText)
+            }
         } else {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("DEVICE ID", style = MaterialTheme.typography.labelLarge)
-                    Text(o.deviceId, style = MaterialTheme.typography.bodyMedium)
-                    Text("X25519 IDENTITY FINGERPRINT", style = MaterialTheme.typography.labelLarge)
-                    Text(o.identityFingerprint, style = MaterialTheme.typography.bodyMedium, color = StColors.Teal)
-                    Text("ED25519 SIGNING FINGERPRINT", style = MaterialTheme.typography.labelLarge)
-                    Text(o.signingFingerprint, style = MaterialTheme.typography.bodyMedium, color = StColors.Teal)
-                }
+            StCard(Modifier.padding(horizontal = 16.dp), accent = t.emerald) {
+                Text("DEVICE ID", style = MaterialTheme.typography.labelLarge, color = t.greyText)
+                Text(o.deviceId, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(8.dp))
+                Text("X25519 IDENTITY FINGERPRINT", style = MaterialTheme.typography.labelLarge, color = t.greyText)
+                Text(o.identityFingerprint, style = MaterialTheme.typography.labelMedium, color = t.teal)
+                Spacer(Modifier.height(8.dp))
+                Text("ED25519 SIGNING FINGERPRINT", style = MaterialTheme.typography.labelLarge, color = t.greyText)
+                Text(o.signingFingerprint, style = MaterialTheme.typography.labelMedium, color = t.teal)
             }
-            Spacer(Modifier.height(12.dp))
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("KEY STORAGE", style = MaterialTheme.typography.labelLarge)
-                    Text(
-                        "Private keys are sealed under the Android Keystore master key via Tink; " +
-                            "group media uses Signal sender keys with AES-256-GCM per packet " +
-                            "(AAD = epoch|sender|seq), sliding replay window 128.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
+            Spacer(Modifier.height(10.dp))
+            StCard(Modifier.padding(horizontal = 16.dp), accent = t.teal) {
+                Text("KEY STORAGE", style = MaterialTheme.typography.labelLarge, color = t.greyText)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Private keys are sealed under the Android Keystore master key via Tink; " +
+                        "group media uses Signal sender keys with AES-256-GCM per packet " +
+                        "(AAD = epoch|sender|seq), sliding replay window 128.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
             action?.let {
-                Text(it, color = StColors.Green)
+                Text(it, color = t.emerald, modifier = Modifier.padding(horizontal = 16.dp))
                 Spacer(Modifier.height(8.dp))
             }
-            Button(onClick = viewModel::resetSessions, modifier = Modifier.fillMaxWidth()) {
-                Text("RESET PAIRWISE SESSIONS")
-            }
+            StButton("RESET PAIRWISE SESSIONS", viewModel::resetSessions, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), style = StButtonStyle.Ghost)
             Spacer(Modifier.height(8.dp))
-            Button(onClick = onVerifyKeys, modifier = Modifier.fillMaxWidth()) {
-                Text("VERIFY CONTACT KEYS")
-            }
+            StButton("VERIFY CONTACT KEYS", onVerifyKeys, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), style = StButtonStyle.Ghost)
         }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -151,35 +156,36 @@ fun KeyVerificationScreen(
     viewModel: SecurityViewModel = hiltViewModel(),
 ) {
     val overview by viewModel.overview.collectAsState()
+    val t = stTokens()
     Column(
         Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(vertical = 24.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("Verify keys", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "Compare this device's fingerprint with the other member's, out-of-band " +
-                "(in person or via a trusted channel). Matching fingerprints mean no MITM.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Spacer(Modifier.height(16.dp))
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text("THIS DEVICE", style = MaterialTheme.typography.labelLarge)
-                Text(
-                    overview?.identityFingerprint ?: "...",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = StColors.Teal,
-                )
-                Spacer(Modifier.height(12.dp))
-                Text("REMOTE", style = MaterialTheme.typography.labelLarge)
-                Text(
-                    remoteFingerprint.ifBlank { "select a member to verify" },
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
+        StTopBar(title = "Verify keys")
+        Spacer(Modifier.height(8.dp))
+        StCard(Modifier.padding(horizontal = 16.dp), accent = t.amber) {
+            Text(
+                "Compare this device's fingerprint with the other member's, out-of-band " +
+                    "(in person or via a trusted channel). Matching fingerprints mean no MITM.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        StCard(Modifier.padding(horizontal = 16.dp), accent = t.emerald) {
+            Text("THIS DEVICE", style = MaterialTheme.typography.labelLarge, color = t.greyText)
+            Text(
+                overview?.identityFingerprint ?: "...",
+                style = MaterialTheme.typography.titleMedium,
+                color = t.teal,
+            )
+            Spacer(Modifier.height(12.dp))
+            Text("REMOTE", style = MaterialTheme.typography.labelLarge, color = t.greyText)
+            Text(
+                remoteFingerprint.ifBlank { "select a member to verify" },
+                style = MaterialTheme.typography.titleMedium,
+            )
         }
     }
 }

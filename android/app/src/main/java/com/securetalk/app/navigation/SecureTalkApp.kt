@@ -73,7 +73,28 @@ fun SecureTalkApp(
 ) {
     val context = LocalContext.current
 
-    NavHost(navController = navController, startDestination = Routes.WELCOME) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.WELCOME,
+        enterTransition = {
+            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) +
+                androidx.compose.animation.slideInHorizontally(
+                    androidx.compose.animation.core.tween(220),
+                ) { it / 12 }
+        },
+        exitTransition = {
+            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160))
+        },
+        popEnterTransition = {
+            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220))
+        },
+        popExitTransition = {
+            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) +
+                androidx.compose.animation.slideOutHorizontally(
+                    androidx.compose.animation.core.tween(220),
+                ) { it / 12 }
+        },
+    ) {
 
         // ---- onboarding (3) ------------------------------------------------------------
         composable(Routes.WELCOME) {
@@ -109,7 +130,9 @@ fun SecureTalkApp(
         // ---- home (1) ---------------------------------------------------------------------
         composable(Routes.HOME) {
             HomeScreen(
-                onOpenChannel = { id -> navController.navigate("channel/$id?name=Channel") },
+                onOpenChannel = { id, name ->
+                    navController.navigate("channel/$id?name=" + android.net.Uri.encode(name))
+                },
                 onGoChannels = { navController.navigate(Routes.CREATE_CHANNEL) },
                 onGoLocalNetwork = { navController.navigate(Routes.HOST_SETUP) },
                 onGoSettings = { navController.navigate(Routes.SETTINGS) },

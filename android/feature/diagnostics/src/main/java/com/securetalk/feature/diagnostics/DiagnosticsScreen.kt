@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,7 +22,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.securetalk.core.common.domain.ConnectionMonitor
 import com.securetalk.core.common.model.ConnectionState
+import com.securetalk.core.design.StButton
+import com.securetalk.core.design.StCard
 import com.securetalk.core.design.StColors
+import com.securetalk.core.design.StChip
+import com.securetalk.core.design.StTopBar
+import com.securetalk.core.design.stTokens
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,26 +93,23 @@ fun DiagnosticsScreen(
     val state by viewModel.connectionState.collectAsState()
     val log by viewModel.log.collectAsState()
 
+    val t = stTokens()
     Column(
         Modifier
             .fillMaxSize()
-            .padding(16.dp)
             .verticalScroll(rememberScrollState()),
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        ) {
-            Text("Diagnostics", style = MaterialTheme.typography.titleLarge)
-            Text(
-                state.name.lowercase(),
-                style = MaterialTheme.typography.labelLarge,
-                color = if (state == ConnectionState.ONLINE_CONNECTED) StColors.Green else StColors.Amber,
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        Card(Modifier.fillMaxWidth()) {
+        StTopBar(
+            title = "Diagnostics",
+            trailing = {
+                StChip(
+                    state.name.lowercase(),
+                    accent = if (state == ConnectionState.ONLINE_CONNECTED) t.emerald else t.amber,
+                )
+            },
+        )
+        Spacer(Modifier.height(4.dp))
+        StCard(Modifier.padding(horizontal = 16.dp), accent = t.teal) {
             Column(Modifier.padding(16.dp)) {
                 Text("PERFORMANCE TARGETS (spec §9)", style = MaterialTheme.typography.labelLarge)
                 Text(
@@ -122,25 +122,26 @@ fun DiagnosticsScreen(
             }
         }
         Spacer(Modifier.height(12.dp))
-        Button(onClick = viewModel::probeLocalHosts, modifier = Modifier.fillMaxWidth()) {
-            Text("PROBE LOCAL HOSTS (NSD)")
-        }
+        StButton("PROBE LOCAL HOSTS (NSD)", viewModel::probeLocalHosts, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), style = com.securetalk.core.design.StButtonStyle.Ghost)
         Spacer(Modifier.height(12.dp))
-        Text("EVENT LOG", style = MaterialTheme.typography.labelLarge)
-        Spacer(Modifier.height(8.dp))
-        log.forEach { entry ->
-            Text(
-                "${java.text.SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date(entry.timestampMs))}  ${entry.text}",
-                style = MaterialTheme.typography.labelSmall,
-                color = StColors.GreyText,
-            )
+        StCard(Modifier.padding(horizontal = 16.dp)) {
+            Text("EVENT LOG", style = MaterialTheme.typography.labelLarge, color = t.greyText)
+            Spacer(Modifier.height(8.dp))
+            if (log.isEmpty()) {
+                Text(
+                    "No transitions recorded yet. Connection events appear here as the network changes (§8).",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = t.greyText,
+                )
+            }
+            log.forEach { entry ->
+                Text(
+                    "${java.text.SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date(entry.timestampMs))}  ${entry.text}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = t.greyText,
+                )
+            }
         }
-        if (log.isEmpty()) {
-            Text(
-                "No transitions recorded yet. Connection events appear here as the network changes (§8).",
-                style = MaterialTheme.typography.bodyMedium,
-                color = StColors.GreyText,
-            )
-        }
+        Spacer(Modifier.height(16.dp))
     }
 }

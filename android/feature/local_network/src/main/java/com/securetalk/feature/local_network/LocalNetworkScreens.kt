@@ -14,11 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -35,7 +31,14 @@ import androidx.lifecycle.viewModelScope
 import com.securetalk.core.common.domain.ChannelManager
 import com.securetalk.core.common.domain.ConnectionMonitor
 import com.securetalk.core.common.model.LocalHostInfo
+import com.securetalk.core.design.StButton
+import com.securetalk.core.design.StButtonStyle
+import com.securetalk.core.design.StCard
 import com.securetalk.core.design.StColors
+import com.securetalk.core.design.StSectionLabel
+import com.securetalk.core.design.StTextField
+import com.securetalk.core.design.StTopBar
+import com.securetalk.core.design.stTokens
 import com.securetalk.core.network.impl.QrPayload
 import com.securetalk.core.network.monitor.ConnectionMonitorImpl
 import com.securetalk.core.network.nsd.NsdDiscovery
@@ -112,51 +115,55 @@ fun HostSetupScreen(
     viewModel: LocalNetworkViewModel = hiltViewModel(),
 ) {
     val running by viewModel.hostRunning.collectAsState()
+    val t = stTokens()
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState()),
     ) {
-        Text("Offline host", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "This device becomes the local host: it runs an embedded Ktor server on port " +
-                "53317, advertises `_securetalk._tcp` via NSD, relays opaque encrypted packets " +
-                "and coordinates floor control. It CANNOT decrypt participants' audio.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = StColors.GreyText,
-        )
-        Spacer(Modifier.height(24.dp))
+        StTopBar(title = "Offline host")
+        StCard(Modifier.padding(horizontal = 16.dp), accent = t.teal) {
+            Text(
+                "This device becomes the local host: it runs an embedded Ktor server on port " +
+                    "53317, advertises `_securetalk._tcp` via NSD, relays opaque encrypted packets " +
+                    "and coordinates floor control. It CANNOT decrypt participants' audio.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = t.greyText,
+            )
+        }
+        Spacer(Modifier.height(14.dp))
         if (!running) {
-            Button(onClick = {
+            StButton("START HOST", {
                 viewModel.startHost()
                 onStartService()
-            }, modifier = Modifier.fillMaxWidth()) { Text("START HOST") }
+            }, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
         } else {
-            Button(onClick = {
+            StButton("STOP HOST", {
                 viewModel.stopHost()
                 onStopService()
-            }, modifier = Modifier.fillMaxWidth()) { Text("STOP HOST") }
+            }, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), style = StButtonStyle.Danger)
         }
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onGoHotspot, modifier = Modifier.weight(1f)) { Text("HOTSPOT GUIDE") }
-            OutlinedButton(onClick = onGoJoin, modifier = Modifier.weight(1f)) { Text("JOIN HOST") }
+        Row(
+            Modifier.padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            StButton("HOTSPOT GUIDE", onGoHotspot, Modifier.weight(1f), style = StButtonStyle.Ghost, compact = true)
+            StButton("JOIN HOST", onGoJoin, Modifier.weight(1f), style = StButtonStyle.Ghost, compact = true)
+        }
+        Spacer(Modifier.height(14.dp))
+        StCard(Modifier.padding(horizontal = 16.dp)) {
+            Text("WHAT THE HOST DOES", style = MaterialTheme.typography.labelLarge, color = t.greyText)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "• Routes ciphertext envelopes by recipient device ID\n" +
+                    "• Enforces the floor protocol (single speaker, 60 s lease, queue)\n" +
+                    "• Fans out binary media frames unchanged\n" +
+                    "• Holds no group keys — no media decryption possible",
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
         Spacer(Modifier.height(16.dp))
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text("WHAT THE HOST DOES", style = MaterialTheme.typography.labelLarge)
-                Text(
-                    "• Routes ciphertext envelopes by recipient device ID\n" +
-                        "• Enforces the floor protocol (single speaker, 60 s lease, queue)\n" +
-                        "• Fans out binary media frames unchanged\n" +
-                        "• Holds no group keys — no media decryption possible",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
     }
 }
 
@@ -170,55 +177,52 @@ fun HotspotGuideScreen(
     viewModel: LocalNetworkViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val t = stTokens()
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState()),
     ) {
-        Text("Hotspot setup", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "SecureTalk cannot toggle your hotspot itself (Android does not allow it). " +
-                "Follow these steps, then come back — peers discover the host automatically via NSD.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Spacer(Modifier.height(16.dp))
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text("1.", style = MaterialTheme.typography.labelLarge)
-                Text("Open Android Settings → Network & internet → Hotspot & tethering (button below).", style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(8.dp))
-                Text("2.", style = MaterialTheme.typography.labelLarge)
-                Text("Turn the Wi-Fi hotspot ON. Note the SSID and password.", style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(8.dp))
-                Text("3.", style = MaterialTheme.typography.labelLarge)
-                Text("Connect every other member's phone to that hotspot (keep this host device connected too).", style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(8.dp))
-                Text("4.", style = MaterialTheme.typography.labelLarge)
-                Text("Return here and run PROBE — devices advertising _securetalk._tcp appear within seconds.", style = MaterialTheme.typography.bodyMedium)
-            }
+        StTopBar(title = "Hotspot setup", onBack = onBack)
+        StCard(Modifier.padding(horizontal = 16.dp), accent = t.amber) {
+            Text(
+                "SecureTalk cannot toggle your hotspot itself (Android does not allow it). " +
+                    "Follow these steps, then come back — peers discover the host automatically via NSD.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
-        Spacer(Modifier.height(16.dp))
-        OutlinedButton(
-            onClick = {
-                val intent = Intent(Settings.ACTION_WIRELESS_SETTINGS)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                runCatching { context.startActivity(intent) }
-                    .onFailure { context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("OPEN WIRELESS SETTINGS") }
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("BACK") }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
+        StCard(Modifier.padding(horizontal = 16.dp)) {
+            Text("1.", style = MaterialTheme.typography.labelLarge, color = t.emerald)
+            Text("Open Android Settings → Network & internet → Hotspot & tethering (button below).", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(8.dp))
+            Text("2.", style = MaterialTheme.typography.labelLarge, color = t.emerald)
+            Text("Turn the Wi-Fi hotspot ON. Note the SSID and password.", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(8.dp))
+            Text("3.", style = MaterialTheme.typography.labelLarge, color = t.emerald)
+            Text("Connect every other member's phone to that hotspot (keep this host device connected too).", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(8.dp))
+            Text("4.", style = MaterialTheme.typography.labelLarge, color = t.emerald)
+            Text("Return here and run PROBE — devices advertising _securetalk._tcp appear within seconds.", style = MaterialTheme.typography.bodyMedium)
+        }
+        Spacer(Modifier.height(14.dp))
+        StButton("OPEN WIRELESS SETTINGS", {
+            val intent = Intent(Settings.ACTION_WIRELESS_SETTINGS)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            runCatching { context.startActivity(intent) }
+                .onFailure { context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        }, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), style = StButtonStyle.Ghost)
         val hosts by viewModel.hosts.collectAsState()
         if (hosts.isNotEmpty()) {
-            Text("Discovered hosts:", style = MaterialTheme.typography.labelLarge)
-            hosts.forEach {
-                Text("${it.hostName} — ${it.address}:${it.port}", color = StColors.Teal)
+            Spacer(Modifier.height(12.dp))
+            StCard(Modifier.padding(horizontal = 16.dp), accent = t.teal) {
+                Text("DISCOVERED HOSTS", style = MaterialTheme.typography.labelLarge, color = t.teal)
+                hosts.forEach {
+                    Text("${it.hostName} — ${it.address}:${it.port}", color = t.teal)
+                }
             }
         }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -235,76 +239,78 @@ fun LocalJoinScreen(
     val error by viewModel.error.collectAsState()
     val joined by viewModel.joined.collectAsState()
 
+    val t = stTokens()
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState()),
     ) {
-        Text("Join offline network", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
-
-        Button(onClick = viewModel::probe, modifier = Modifier.fillMaxWidth()) {
-            Text("SEARCH FOR HOSTS (NSD)")
-        }
-        Spacer(Modifier.height(12.dp))
+        StTopBar(title = "Join offline network")
+        Spacer(Modifier.height(4.dp))
+        StButton("SEARCH FOR HOSTS (NSD)", viewModel::probe, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), style = StButtonStyle.Ghost)
+        Spacer(Modifier.height(10.dp))
         hosts.forEach { host ->
-            Card(onClick = { viewModel.connectTo(host) }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(host.hostName, style = MaterialTheme.typography.titleMedium)
-                    Text("${host.address}:${host.port}", style = MaterialTheme.typography.labelSmall, color = StColors.Teal)
-                }
+            StCard(
+                Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                accent = t.teal,
+                onClick = { viewModel.connectTo(host) },
+            ) {
+                Text(host.hostName, style = MaterialTheme.typography.titleMedium)
+                Text("${host.address}:${host.port}", style = MaterialTheme.typography.labelSmall, color = t.teal)
             }
-            Spacer(Modifier.height(8.dp))
         }
 
-        Spacer(Modifier.height(16.dp))
-        OutlinedTextField(
-            value = payload,
-            onValueChange = { payload = it },
-            label = { Text("Invite QR payload") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-        )
-        Spacer(Modifier.height(8.dp))
-        Button(
-            onClick = { viewModel.joinByQrPayload(payload) },
-            enabled = payload.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("JOIN WITH PAYLOAD") }
-
-        Spacer(Modifier.height(16.dp))
-        Text("Manual fallback", style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = manualHost,
-                onValueChange = { manualHost = it },
-                label = { Text("Host IP") },
-                modifier = Modifier.weight(2f),
-                singleLine = true,
+        Spacer(Modifier.height(14.dp))
+        StCard(Modifier.padding(horizontal = 16.dp)) {
+            StTextField(
+                value = payload,
+                onValueChange = { payload = it },
+                label = "Invite QR payload",
             )
-            OutlinedTextField(
-                value = manualPort,
-                onValueChange = { manualPort = it },
-                label = { Text("Port") },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
+            Spacer(Modifier.height(10.dp))
+            StButton(
+                "JOIN WITH PAYLOAD",
+                { viewModel.joinByQrPayload(payload) },
+                enabled = payload.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
             )
         }
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = {
-                val port = manualPort.toIntOrNull() ?: 53317
-                viewModel.connectTo(LocalHostInfo("manual", manualHost.trim(), port))
-            },
-            enabled = manualHost.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("CONNECT MANUALLY") }
+
+        Spacer(Modifier.height(12.dp))
+        StSectionLabel("MANUAL FALLBACK")
+        StCard(Modifier.padding(horizontal = 16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StTextField(
+                    value = manualHost,
+                    onValueChange = { manualHost = it },
+                    label = "Host IP",
+                    modifier = Modifier.weight(2f),
+                )
+                StTextField(
+                    value = manualPort,
+                    onValueChange = { manualPort = it },
+                    label = "Port",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            StButton(
+                "CONNECT MANUALLY",
+                {
+                    val port = manualPort.toIntOrNull() ?: 53317
+                    viewModel.connectTo(LocalHostInfo("manual", manualHost.trim(), port))
+                },
+                enabled = manualHost.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+                style = StButtonStyle.Ghost,
+            )
+        }
 
         error?.let {
             Spacer(Modifier.height(8.dp))
-            Text(it, color = StColors.TxRed)
+            Text(it, color = t.txRed, modifier = Modifier.padding(horizontal = 16.dp))
         }
+        Spacer(Modifier.height(16.dp))
     }
 
     androidx.compose.runtime.LaunchedEffect(joined) {

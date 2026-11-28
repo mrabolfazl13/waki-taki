@@ -22,7 +22,7 @@ class SettingsRepository(private val context: Context) {
     ) {
         companion object {
             /** Server origin; REST/WS paths are appended by the transports. */
-            const val DEFAULT_API_BASE_URL = "https://localhost/"
+            const val DEFAULT_API_BASE_URL = "https://wakitaki.sadsirco.ir/"
         }
     }
 

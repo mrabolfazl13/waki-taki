@@ -31,7 +31,8 @@ object CrashReporter {
             }
             previous?.uncaughtException(thread, throwable)
         }
-        // Upload any crash captured during the previous run.
+        // Upload any crash captured during the previous run — do this FIRST so a
+        // crash that repeats immediately afterwards still gets reported.
         val pending = File(context.filesDir, FILE)
         if (pending.isFile) {
             val text = try { pending.readText() } catch (_: Throwable) { null }
@@ -55,7 +56,16 @@ object CrashReporter {
             appendLine(sw.toString())
         }
         File(context.filesDir, FILE).writeText(text)
+        // Best-effort immediate upload on a separate thread; if the network is
+        // unreachable the file remains for the next launch.
+        Thread {
+            if (post(text)) {
+                try { pending0(context).delete() } catch (_: Throwable) {}
+            }
+        }.start()
     }
+
+    private fun pending0(context: Context): File = File(context.filesDir, FILE)
 
     /** JSON with the raw stack embedded; escaping via manual replacement is safe here. */
     fun json(stack: String): String {

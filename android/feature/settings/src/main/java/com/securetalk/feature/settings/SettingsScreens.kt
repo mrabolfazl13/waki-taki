@@ -10,11 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -32,7 +28,17 @@ import com.securetalk.core.common.domain.ChannelManager
 import com.securetalk.core.common.domain.ConnectionMonitor
 import com.securetalk.core.common.model.ConnectionState
 import com.securetalk.core.database.data.SettingsRepository
+import com.securetalk.core.design.StAvatar
+import com.securetalk.core.design.StButton
+import com.securetalk.core.design.StButtonStyle
+import com.securetalk.core.design.StCard
+import com.securetalk.core.design.StChip
 import com.securetalk.core.design.StColors
+import com.securetalk.core.design.StSectionLabel
+import com.securetalk.core.design.StSwitch
+import com.securetalk.core.design.StTextField
+import com.securetalk.core.design.StTopBar
+import com.securetalk.core.design.stTokens
 import com.securetalk.core.network.impl.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -66,6 +72,7 @@ class SettingsViewModel @Inject constructor(
     }
 }
 
+/** Settings: identity, account, network, audio and privacy in tidy sections. */
 @Composable
 fun SettingsScreen(
     onLogout: () -> Unit,
@@ -78,114 +85,128 @@ fun SettingsScreen(
     var name by remember(settings.displayName) { mutableStateOf(settings.displayName) }
     var url by remember(settings.apiBaseUrl) { mutableStateOf(settings.apiBaseUrl) }
     val connection by viewModel.connectionMonitor.state.collectAsState()
+    val session by viewModel.session.collectAsState()
+    val t = stTokens()
+    val online = connection == ConnectionState.ONLINE_CONNECTED
 
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState()),
     ) {
-        Text("Settings", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
+        StTopBar(title = "Settings")
 
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Display name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                Button(onClick = { viewModel.setDisplayName(name) }) { Text("SAVE NAME") }
+        // ---- identity ------------------------------------------------------------
+        StCard(
+            Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            accent = if (online) t.emerald else t.txRed,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StAvatar(session.displayName.ifBlank { settings.displayName }, size = 46.dp)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        session.displayName.ifBlank { settings.displayName.ifBlank { "Not signed in" } },
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        "connection · ${connection.name.lowercase()}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (online) t.emerald else t.greyText,
+                    )
+                }
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("SERVER", style = MaterialTheme.typography.labelLarge)
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    label = { Text("API base URL (/api/v1)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                Button(onClick = { viewModel.setApiBaseUrl(url) }) { Text("SAVE SERVER") }
-            }
+        StSectionLabel("ACCOUNT")
+        StCard(Modifier.padding(horizontal = 16.dp)) {
+            StTextField(value = name, onValueChange = { name = it }, label = "Display name")
+            Spacer(Modifier.height(10.dp))
+            StButton("SAVE NAME", { viewModel.setDisplayName(name) }, compact = true)
         }
 
-        Spacer(Modifier.height(12.dp))
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+        StSectionLabel("NETWORK")
+        StCard(Modifier.padding(horizontal = 16.dp)) {
+            StTextField(value = url, onValueChange = { url = it }, label = "API base URL (/api/v1)")
+            Spacer(Modifier.height(10.dp))
+            StButton("SAVE SERVER", { viewModel.setApiBaseUrl(url) }, compact = true)
+        }
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            StButton("DEVICES", onGoDevices, style = StButtonStyle.Ghost, compact = true)
+            StButton("DIAGNOSTICS", onGoDiagnostics, style = StButtonStyle.Ghost, compact = true)
+            StButton("SECURITY", onGoSecurity, style = StButtonStyle.Ghost, compact = true)
+        }
+
+        StSectionLabel("AUDIO & PRIVACY")
+        StCard(Modifier.padding(horizontal = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f)) {
                     Text("Default to speaker on PTT", style = MaterialTheme.typography.bodyLarge)
-                    Switch(checked = settings.defaultSpeaker, onCheckedChange = viewModel::setDefaultSpeaker)
+                    Text("Route transmission to the loudspeaker", style = MaterialTheme.typography.labelSmall, color = t.greyText)
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                StSwitch(checked = settings.defaultSpeaker, onCheckedChange = viewModel::setDefaultSpeaker)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f)) {
                     Text("Diagnostics collection", style = MaterialTheme.typography.bodyLarge)
-                    Switch(checked = settings.diagnosticsEnabled, onCheckedChange = viewModel::setDiagnostics)
+                    Text("Record connection transitions locally", style = MaterialTheme.typography.labelSmall, color = t.greyText)
                 }
+                StSwitch(checked = settings.diagnosticsEnabled, onCheckedChange = viewModel::setDiagnostics)
             }
         }
 
         Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onGoDevices, modifier = Modifier.weight(1f)) { Text("DEVICES") }
-            Button(onClick = onGoDiagnostics, modifier = Modifier.weight(1f)) { Text("DIAGNOSTICS") }
-            Button(onClick = onGoSecurity, modifier = Modifier.weight(1f)) { Text("SECURITY") }
-        }
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = { viewModel.logout(onLogout) },
-            modifier = Modifier.fillMaxWidth(),
-            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = StColors.TxRed),
-        ) { Text("LOG OUT") }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Connection: ${connection.name.lowercase()}",
-            style = MaterialTheme.typography.labelSmall,
-            color = if (connection == ConnectionState.ONLINE_CONNECTED) StColors.Green else StColors.GreyText,
+        StButton(
+            "LOG OUT",
+            { viewModel.logout(onLogout) },
+            Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+            style = StButtonStyle.Danger,
         )
+        Spacer(Modifier.height(24.dp))
     }
 }
 
+/** Audio settings: codec + audio path documentation and speaker toggle. */
 @Composable
 fun AudioSettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settingsFlow.collectAsState()
+    val t = stTokens()
     Column(
         Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState()),
     ) {
-        Text("Audio", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("CODEC", style = MaterialTheme.typography.labelLarge)
-                Text(
-                    "Opus via MediaCodec on Android 10+ (API 29). Devices on API 26-28 use the " +
-                        "AAC-LC MediaCodec fallback — channels pick one codec per epoch.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text("AUDIO PATH", style = MaterialTheme.typography.labelLarge)
-                Text(
-                    "Capture uses the VOICE_COMMUNICATION audio path (platform echo cancellation " +
-                        "and noise suppression), 48 kHz mono, 20 ms frames. Playback uses the " +
-                        "low-latency AudioTrack with an adaptive jitter buffer (max 400 ms) and " +
-                        "silence-based packet-loss concealment.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+        StTopBar(title = "Audio")
+        StSectionLabel("CODEC")
+        StCard(Modifier.padding(horizontal = 16.dp), accent = t.teal) {
+            Text(
+                "Opus via MediaCodec on Android 10+ (API 29). Devices on API 26-28 use the " +
+                    "AAC-LC MediaCodec fallback — channels pick one codec per epoch.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        StSectionLabel("AUDIO PATH")
+        StCard(Modifier.padding(horizontal = 16.dp), accent = t.emerald) {
+            Text(
+                "Capture uses the VOICE_COMMUNICATION audio path (platform echo cancellation " +
+                    "and noise suppression), 48 kHz mono, 20 ms frames. Playback uses the " +
+                    "low-latency AudioTrack with an adaptive jitter buffer (max 400 ms) and " +
+                    "silence-based packet-loss concealment.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        StSectionLabel("OUTPUT")
+        StCard(Modifier.padding(horizontal = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("Default to speaker", style = MaterialTheme.typography.bodyLarge)
+                StSwitch(checked = settings.defaultSpeaker, onCheckedChange = viewModel::setDefaultSpeaker)
             }
         }
-        Spacer(Modifier.height(16.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Text("Default to speaker", style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = settings.defaultSpeaker, onCheckedChange = viewModel::setDefaultSpeaker)
-        }
+        Spacer(Modifier.height(24.dp))
     }
 }
